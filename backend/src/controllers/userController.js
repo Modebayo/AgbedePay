@@ -103,14 +103,23 @@ export const getMyAvatar = asyncHandler(async (req, res) => {
  * file, and returns the updated profile.
  */
 export const uploadAvatar = asyncHandler(async (req, res) => {
-  // The multer middleware runs inline as a route-level handler. Wrapping it in
-  // asyncHandler means a multer failure (file too large, wrong field name, too
-  // many files) still reaches the central errorHandler and is returned as a
-  // normal { success: false } JSON envelope instead of a raw 500.
-  await avatarUpload(req, res, async () => {
-    const profile = await setProfilePicture(req.user.id, req.file);
-    res.json({ success: true, data: { profile } });
+  // The multer middleware is run manually rather than mounted on the route,
+  // because mounting it would put it OUTSIDE asyncHandler's try/catch. Anything
+  // thrown inside its `next` callback — including every rejection from
+  // setProfilePicture — would then escape as an unhandled rejection, take the
+  // process down with it, and leave the client with a dropped socket instead of
+  // a JSON error. Driving it by hand keeps every failure on the asyncHandler
+  // path to errorHandler.
+  //
+  // The two-argument form: multer parses the multipart body, then calls
+  // onDone(), and any error it hits (file too large, wrong field, no file) is
+  // passed to onDone as the first argument rather than being thrown.
+  await new Promise((resolve, reject) => {
+    avatarUpload(req, res, (err) => (err ? reject(err) : resolve()));
   });
+
+  const profile = await setProfilePicture(req.user.id, req.file);
+  res.json({ success: true, data: { profile } });
 });
 
 /** DELETE /api/users/avatar — removes the picture. */

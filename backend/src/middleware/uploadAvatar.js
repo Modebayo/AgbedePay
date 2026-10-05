@@ -29,10 +29,10 @@
 // file executes the script). GIF is excluded for the same class of reason: it can
 // carry script in older engines.
 
-import multer from "multer";
 import crypto from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 import fs from "node:fs/promises";
 import { ApiError } from "../utils/errors.js";
 
@@ -103,9 +103,42 @@ export function sniffMime(buf) {
   return null;
 }
 
+// multer is loaded LAZILY, on first use, and never with a top-level `import`.
+//
+// This is deliberate and it was a real production incident: this module sits in
+// the startup import chain (app.js → routes/userRouter.js → controllers/
+// userController.js → this file). With a static `import multer from "multer"`,
+// a deployment whose node_modules was missing that one package threw
+// ERR_MODULE_NOT_FOUND while the module graph was still loading — before
+// app.listen() ever ran. The process died, nothing bound the port, and the
+// reverse proxy returned 502 for EVERY route including /health. A profile
+// picture feature took the whole site offline.
+//
+// Deferring the load means a missing or broken multer can now only ever break
+// the one endpoint that needs it. Every other route — login, transfers,
+// everything — keeps serving, and this one returns a clear 501 telling the
+// operator what to install.
+let multerSingleton = null;
+
+function getMulter() {
+  if (multerSingleton) return multerSingleton;
+  try {
+    // createRequire resolves CommonJS packages from an ES module. multer is CJS.
+    const require = createRequire(import.meta.url);
+    multerSingleton = require("multer");
+    return multerSingleton;
+  } catch (err) {
+    throw new ApiError(
+      501,
+      "Profile picture uploads are unavailable: the 'multer' package is not installed. Run `npm install` on the server.",
+      "UPLOAD_DEPENDENCY_MISSING"
+    );
+  }
+}
+
 /**
- * multer middleware: accepts exactly one file field, buffers it in memory,
- * validates the bytes, and writes it to a generated filename.
+ * Builds the multer middleware: accepts exactly one file field, buffers it in
+ * memory, validates the bytes, and writes it to a generated filename.
  *
  * In-memory (`memoryStorage`) rather than disk: the file is only written after
  * the bytes have been sniffed, so a rejected upload never touches the disk at
@@ -115,25 +148,34 @@ export function sniffMime(buf) {
  * every other failure in the app — the client always gets
  * { success: false, message, code } and never a raw multer error.
  */
-export const avatarUpload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: MAX_AVATAR_BYTES,
-    files: 1, // one image, never a bundle
-    fields: 0, // no text fields expected; the picture is the whole request
-  },
-  fileFilter(_req, file, cb) {
-    // A first cheap gate on the DECLARED type, purely to reject obvious junk
-    // early. This is NOT the security check — fileFilter cannot see the bytes,
-    // and `file.mimetype` is attacker-controlled. The real check is sniffMime
-    // below, which runs on the actual buffer.
-    if (file.mimetype && !ALLOWED.has(file.mimetype)) {
-      cb(new ApiError(415, "Profile pictures must be a JPEG, PNG or WebP image", "UNSUPPORTED_IMAGE_TYPE"));
-      return;
-    }
-    cb(null, true);
-  },
-}).single("avatar");
+export function avatarUpload(req, res, next) {
+  const multer = getMulter();
+  return multer({
+    storage: multer.memoryStorage(),
+    limits: {
+      fileSize: MAX_AVATAR_BYTES,
+      files: 1, // one image, never a bundle
+      fields: 0, // no text fields expected; the picture is the whole request
+    },
+    fileFilter(_req, file, cb) {
+      // A first cheap gate on the DECLARED type, purely to reject obvious junk
+      // early. This is NOT the security check — fileFilter cannot see the bytes,
+      // and `file.mimetype` is attacker-controlled. The real check is sniffMime
+      // below, which runs on the actual buffer.
+      if (file.mimetype && !ALLOWED.has(file.mimetype)) {
+        cb(
+          new ApiError(
+            415,
+            "Profile pictures must be a JPEG, PNG or WebP image",
+            "UNSUPPORTED_IMAGE_TYPE"
+          )
+        );
+        return;
+      }
+      cb(null, true);
+    },
+  }).single("avatar")(req, res, next);
+}
 
 /**
  * Runs after multer. Sniffs the real bytes and persists the file.

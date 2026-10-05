@@ -31,7 +31,7 @@ export async function findByUserId(id) {
   const { rows } = await query(
     `SELECT id, full_name, phone, email, status, is_verified,
             referral_code, login_otp_enabled, security_alert_enabled,
-            avatar_filename, avatar_updated_at,
+            avatar_filename, avatar_mime, avatar_updated_at,
             created_at, updated_at
        FROM users
       WHERE id = $1`,
@@ -229,14 +229,22 @@ export async function setAvatar(userId, { filename, mime, sizeBytes }) {
  * can unlink it.
  */
 export async function clearAvatar(userId) {
+  // The previous filename is captured in a CTE BEFORE the UPDATE overwrites it.
+  // Returning avatar_filename straight from the UPDATE would always be NULL,
+  // because RETURNING exposes post-update values — which would silently skip
+  // the unlink and leave the file on disk forever.
   const { rows } = await query(
-    `UPDATE users
+    `WITH previous AS (
+       SELECT avatar_filename FROM users WHERE id = $1
+     )
+     UPDATE users u
         SET avatar_filename = NULL,
             avatar_mime = NULL,
             avatar_size_bytes = NULL,
             avatar_updated_at = now()
-      WHERE id = $1
-      RETURNING id, full_name, avatar_filename AS previous_filename`,
+      WHERE u.id = $1
+     RETURNING u.id, u.full_name,
+               (SELECT avatar_filename FROM previous) AS previous_filename`,
     [userId]
   );
   return rows[0] ?? null;

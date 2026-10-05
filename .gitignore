@@ -37,5 +37,7 @@ ada.cookies.txt
 chidi.cookies.txt
 termii-test.json
 
-# User-uploaded files
-backend/storage/avatars/
+# User-uploaded files (profile pictures). Personal data — never committed.
+# No leading slash: in .gitignore that anchors the pattern to the repo root
+# instead of matching at any depth. The directory is created at runtime.
+backend/storage/

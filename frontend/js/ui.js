@@ -196,8 +196,6 @@ minus: '<path d="M5 12h14"/>',
 
   // The app shell (top nav + profile). profile comes from /users/me.
   function renderShell(profile, activePage) {
-    const initials = initialsOf(profile.fullName);
-
     // The old pill row under the content (Home / Savings / Profile) is gone:
     // the fixed bottom nav covers Home and Profile, so the element is removed
     // outright rather than left as an empty bar.
