@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Send money — AgbedePay</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="icon" type="image/svg+xml" href="../brand/favicon.svg" />
+  <script>try{if(localStorage.getItem("agbe_theme")==="dark")document.documentElement.setAttribute("data-theme","dark")}catch(e){}</script>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <a class="brand" href="dashboard.html">
+        <span class="brand__mark" aria-hidden="true"><img src="../brand/symbol.svg" alt="" draggable="false" /></span>
+        <span class="brand__name">AgbedePay</span>
+      </a>
+      <div class="topbar__right" data-topbar-right></div>
+    </header>
+
+    <main class="page">
+      <div class="page-head">
+        <div>
+          <h1 class="page-title">Send money</h1>
+          <p class="page-sub">Instant to another AgbedePay wallet or any bank account.</p>
+        </div>
+        <a class="link-btn" href="request.html">Request money</a>
+      </div>
+
+      <div class="send-methods" role="tablist" aria-label="Send method">
+        <button class="send-method is-active" type="button" data-method="wallet" role="tab" aria-selected="true">To wallet</button>
+        <button class="send-method" type="button" data-method="bank" role="tab" aria-selected="false">To bank account</button>
+      </div>
+
+      <form class="form card" id="send-form" novalidate>
+        <div class="error-banner" role="alert"></div>
+
+        <div class="field" data-field="recipient">
+          <label class="field__label" for="recipient">Recipient phone number</label>
+          <input class="input" id="recipient" name="recipientPhone" type="tel" inputmode="numeric" autocomplete="tel" maxlength="11" placeholder="e.g. 08087654321" required />
+          <p class="field__error"></p>
+        </div>
+
+        <div class="field" data-field="bank" hidden>
+          <label class="field__label" for="bank-name">Bank</label>
+          <select class="input" id="bank-name" name="bankName" required>
+            <option value="">Select a bank…</option>
+          </select>
+          <p class="field__error"></p>
+        </div>
+
+        <div class="field" data-field="bank" hidden>
+          <label class="field__label" for="account-number">Account number</label>
+          <input class="input" id="account-number" name="accountNumber" type="text" inputmode="numeric" maxlength="10" placeholder="10-digit NUBAN" autocomplete="off" required />
+          <p class="field__error"></p>
+          <p class="bank-verified" id="bank-verified" hidden>
+            <span class="ic ic--check" aria-hidden="true"></span> Sending to <strong id="bank-verified-name"></strong>
+          </p>
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="amount">Amount (₦, whole naira only)</label>
+          <input class="input" id="amount" name="amount" type="number" min="1" step="1" inputmode="numeric" placeholder="e.g. 5000" required />
+          <p class="field__error"></p>
+          <p id="preview" style="margin-top:4px;font-size:0.88rem;color:var(--muted);"></p>
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="narration">Note <span style="font-weight:400;color:var(--muted)">— optional</span></label>
+          <input class="input" id="narration" name="narration" type="text" maxlength="255" placeholder="What's this for?" />
+          <p class="field__error"></p>
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="pin">Confirm with your 6-digit PIN</label>
+          <input class="input" id="pin" name="pin" type="password" inputmode="numeric" autocomplete="current-password" maxlength="6" placeholder="••••••" required />
+          <p class="field__error"></p>
+        </div>
+
+        <button class="btn btn--green" id="send-submit" type="submit">Send now</button>
+      </form>
+    </main>
+
+
+    <div class="ad-ticker" data-ad-ticker aria-hidden="true"></div>
+  </div>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/ui.js"></script>
+  <script src="../js/pages/send.js"></script>
+</body>
+</html>

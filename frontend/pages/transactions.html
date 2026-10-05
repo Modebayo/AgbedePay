@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Transactions — AgbedePay</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="icon" type="image/svg+xml" href="../brand/favicon.svg" />
+  <script>try{if(localStorage.getItem("agbe_theme")==="dark")document.documentElement.setAttribute("data-theme","dark")}catch(e){}</script>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <a class="brand" href="dashboard.html">
+        <span class="brand__mark" aria-hidden="true"><img src="../brand/symbol.svg" alt="" draggable="false" /></span>
+        <span class="brand__name">AgbedePay</span>
+      </a>
+      <div class="topbar__right" data-topbar-right></div>
+    </header>
+
+    <main class="page">
+      <h1 class="page-title">Transactions</h1>
+      <p class="page-sub">Your complete money history, newest first.</p>
+      <div style="display:flex;justify-content:flex-end;margin:-8px 0 12px"><a class="link-btn" href="statements.html">Monthly statements (CSV) ↓</a></div>
+
+      <div class="tx-toolbar">
+        <div class="tx-filters" role="group" aria-label="Filter transactions">
+          <button class="chip is-selected" type="button" data-filter="ALL">All</button>
+          <button class="chip" type="button" data-filter="IN">Money in</button>
+          <button class="chip" type="button" data-filter="OUT">Money out</button>
+          <button class="chip" type="button" data-filter="TRANSFER">Transfers</button>
+          <button class="chip" type="button" data-filter="BANK">Bank</button>
+          <button class="chip" type="button" data-filter="AIRTIME">Airtime</button>
+          <button class="chip" type="button" data-filter="BILLS">Bills</button>
+          <button class="chip" type="button" data-filter="BETTING">Betting</button>
+          <button class="chip" type="button" data-filter="SAVINGS_DEPOSIT">Savings</button>
+          <button class="chip" type="button" data-filter="FUNDING">Top-ups</button>
+          <button class="chip" type="button" data-filter="WITHDRAWAL">Cash-out</button>
+        </div>
+        <select class="input input--sort" id="tx-sort" aria-label="Sort transactions">
+          <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+          <option value="amount_hi">Amount: high to low</option>
+          <option value="amount_lo">Amount: low to high</option>
+        </select>
+      </div>
+
+      <div id="tx-area" aria-live="polite"></div>
+      <button class="btn btn--ghost btn--block" id="load-more" type="button" hidden>Load more</button>
+    </main>
+
+
+    <div class="ad-ticker" data-ad-ticker aria-hidden="true"></div>
+  </div>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/ui.js"></script>
+  <script src="../js/pages/transactions.js"></script>
+</body>
+</html>

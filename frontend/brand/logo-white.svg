@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 100" role="img" aria-label="AgbedePay — white on dark">
+  <g transform="translate(6,18) scale(0.64)">
+    <g fill="none" stroke="#FFFFFF" stroke-width="11" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M 16 82 L 42 42 Q 50 25 58 42 L 66 82 C 71 82 76 78 80 70"/>
+      <path d="M 37 60 L 59 60"/>
+    </g>
+    <circle cx="74" cy="30" r="4.5" fill="#FFFFFF"/>
+  </g>
+  <text x="84" y="66" font-family="Sora, Manrope, 'Segoe UI', Inter, sans-serif" font-size="44" font-weight="700" letter-spacing="-0.015em" fill="#FFFFFF">
+    AgbedePay
+  </text>
+</svg>

@@ -1,0 +1,35 @@
+{
+  "name": "agbedepay",
+  "version": "0.1.0",
+  "description": "AgbedePay — Pay. Save. Grow. A fintech MVP learning project (Node.js + Express + PostgreSQL).",
+  "type": "module",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "node backend/server.js",
+    "dev": "node --watch backend/server.js",
+    "test": "node --test \"tests/**/*.test.js\"",
+    "db:create": "node backend/src/database/create-db.js",
+    "db:migrate": "node backend/src/database/migrate.js",
+    "db:seed": "node backend/src/database/seed.js",
+    "db:seed:wealth": "node backend/src/database/seed-wealth-catalogue.js",
+    "db:setup": "npm run db:create && npm run db:migrate && npm run db:seed"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "argon2": "^0.45.1",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "express-rate-limit": "^8.7.0",
+    "helmet": "^8.0.0",
+    "multer": "^2.4.0",
+    "pg": "^8.13.1"
+  },
+  "overrides": {
+    "qs": "^6.16.0"
+  },
+  "license": "MIT"
+}

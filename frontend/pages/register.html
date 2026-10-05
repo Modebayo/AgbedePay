@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Create account — AgbedePay</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="icon" type="image/svg+xml" href="../brand/favicon.svg" />
+</head>
+<body class="auth-body">
+  <main class="auth-card">
+    <div class="brand brand--center">
+      <span class="brand__mark" aria-hidden="true"><img src="../brand/symbol.svg" alt="" draggable="false" /></span>
+      <span class="brand__name">AgbedePay</span>
+    </div>
+
+    <h1 class="auth-title">Create your account</h1>
+    <p class="auth-sub">Free to open. Your wallet is created instantly.</p>
+
+    <form class="form" id="register-form" novalidate>
+      <div class="error-banner" role="alert"></div>
+
+      <div class="field">
+        <label class="field__label" for="fullName">Full name</label>
+        <input class="input" id="fullName" name="fullName" type="text" autocomplete="name" maxlength="120" placeholder="e.g. Ada Obi" required />
+        <p class="field__error"></p>
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="phone">Phone number</label>
+        <input class="input" id="phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel" maxlength="11" placeholder="e.g. 08012345678" required />
+        <p class="field__error"></p>
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="email">Email <span class="field__hint">(optional)</span></label>
+        <input class="input" id="email" name="email" type="email" autocomplete="email" maxlength="255" placeholder="you@example.com" />
+        <p class="field__error"></p>
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="pin">Transaction PIN (6 digits)</label>
+        <input class="input" id="pin" name="pin" type="password" inputmode="numeric" autocomplete="new-password" maxlength="6" placeholder="••••••" required />
+        <p class="field__error"></p>
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="confirmPin">Confirm PIN</label>
+        <input class="input" id="confirmPin" name="confirmPin" type="password" inputmode="numeric" autocomplete="new-password" maxlength="6" placeholder="••••••" required />
+        <p class="field__error"></p>
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="referralCode">Referral code <span class="field__hint">(optional)</span></label>
+        <input class="input" id="referralCode" name="referralCode" type="text" autocomplete="off" maxlength="12" placeholder="e.g. A397873A" />
+        <p class="field__error"></p>
+        <p class="field__hint">Invited by a friend? Enter their code to unlock the ₦500 welcome bonus.</p>
+      </div>
+
+      <button class="btn btn--primary" id="register-submit" type="submit">Create account</button>
+    </form>
+
+    <p class="auth-alt">Already have an account? <a href="login.html">Log in</a></p>
+  </main>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/ui.js"></script>
+  <script src="../js/pages/register.js"></script>
+</body>
+</html>

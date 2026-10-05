@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reset your PIN — AgbedePay</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="icon" type="image/svg+xml" href="../brand/favicon.svg" />
+</head>
+<body class="auth-body">
+  <main class="auth-card">
+    <div class="brand brand--center">
+      <span class="brand__mark" aria-hidden="true"><img src="../brand/symbol.svg" alt="" draggable="false" /></span>
+      <span class="brand__name">AgbedePay</span>
+    </div>
+
+    <h1 class="auth-title">Reset your PIN</h1>
+
+    <!-- Step 1: phone -->
+    <section class="step" id="step-1">
+      <p class="auth-sub">Enter the phone number on your account. We'll issue a verification code.</p>
+      <form class="form" id="phone-form" novalidate>
+        <div class="error-banner" role="alert"></div>
+        <div class="field">
+          <label class="field__label" for="phone">Phone number</label>
+          <input class="input" id="phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel" maxlength="11" placeholder="e.g. 08012345678" required />
+          <p class="field__error"></p>
+        </div>
+        <button class="btn btn--primary" id="phone-submit" type="submit">Send reset code</button>
+      </form>
+      <p class="auth-alt" style="margin-top:12px"><a href="login.html">Back to login</a></p>
+    </section>
+
+    <!-- Step 2: code + new PIN (shown after the code is issued) -->
+    <section class="step" id="step-2" hidden>
+      <div class="notice" role="status">
+        <strong>DEV/MOCK mode</strong>
+        A 6-digit code was printed to the server console. Look for <code>[DEV/MOCK OTP]</code>.
+      </div>
+      <form class="form" id="reset-form" novalidate>
+        <div class="error-banner" role="alert"></div>
+
+        <div class="field">
+          <label class="field__label" for="reset-code">Verification code</label>
+          <input class="input" id="reset-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••" required />
+          <p class="field__error"></p>
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="newPin">New 6-digit PIN</label>
+          <input class="input" id="newPin" name="pin" type="password" inputmode="numeric" autocomplete="new-password" maxlength="6" placeholder="••••••" required />
+          <p class="field__error"></p>
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="confirmPin">Confirm new PIN</label>
+          <input class="input" id="confirmPin" name="confirmPin" type="password" inputmode="numeric" autocomplete="new-password" maxlength="6" placeholder="••••••" required />
+          <p class="field__error"></p>
+        </div>
+
+        <button class="btn btn--primary" id="reset-submit" type="submit">Reset PIN</button>
+      </form>
+      <p class="auth-alt" style="margin-top:12px"><a href="login.html">Cancel and log in</a></p>
+    </section>
+  </main>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/ui.js"></script>
+  <script src="../js/pages/forgot.js"></script>
+</body>
+</html>

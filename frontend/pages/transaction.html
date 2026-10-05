@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Transaction — AgbedePay</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="icon" type="image/svg+xml" href="../brand/favicon.svg" />
+  <script>try{if(localStorage.getItem("agbe_theme")==="dark")document.documentElement.setAttribute("data-theme","dark")}catch(e){}</script>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <a class="brand" href="dashboard.html">
+        <span class="brand__mark" aria-hidden="true"><img src="../brand/symbol.svg" alt="" draggable="false" /></span>
+        <span class="brand__name">AgbedePay</span>
+      </a>
+      <div class="topbar__right" data-topbar-right></div>
+    </header>
+
+    <main class="page" id="page">
+      <p class="page-sub">Loading transaction…</p>
+    </main>
+
+
+    <div class="ad-ticker" data-ad-ticker aria-hidden="true"></div>
+
+    <!-- Reversal confirmation modal -->
+    <div class="modal-backdrop" id="reverse-modal" hidden>
+      <div class="modal">
+        <h2 class="modal__title">Reverse this transfer?</h2>
+        <p class="modal__text" id="reverse-modal-text"></p>
+        <div class="field">
+          <label class="field__label" for="reverse-pin">Confirm with your 6-digit PIN</label>
+          <input class="input" id="reverse-pin" type="password" inputmode="numeric" maxlength="6" placeholder="••••••" />
+          <p class="field__error" style="display:none;color:var(--danger);font-size:.82rem" id="reverse-pin-error"></p>
+        </div>
+        <div class="modal__actions">
+          <button class="ghost-btn" type="button" id="reverse-cancel">Cancel</button>
+          <button class="btn btn--green" type="button" id="reverse-confirm" style="width:auto">Yes, reverse</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/ui.js"></script>
+  <script src="../js/pages/transaction.js"></script>
+</body>
+</html>

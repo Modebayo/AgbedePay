@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%">
+  <defs>
+    <linearGradient id="flowband" gradientUnits="userSpaceOnUse" x1="16" y1="84" x2="74" y2="30">
+      <stop offset="0" stop-color="#0A1E3C"/>
+      <stop offset="0.45" stop-color="#1B4DFF"/>
+      <stop offset="1" stop-color="#12B76A"/>
+    </linearGradient>
+  </defs>
+  <g fill="none" stroke="url(#flowband)" stroke-width="11" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 16 82 L 42 42 Q 50 25 58 42 L 66 82 C 71 82 76 78 80 70"/>
+    <path d="M 37 60 L 59 60"/>
+  </g>
+  <circle cx="74" cy="30" r="4.5" fill="#12B76A"/>
+</svg>

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Request money — AgbedePay</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="icon" type="image/svg+xml" href="../brand/favicon.svg" />
+  <script>try{if(localStorage.getItem("agbe_theme")==="dark")document.documentElement.setAttribute("data-theme","dark")}catch(e){}</script>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <a class="brand" href="dashboard.html">
+        <span class="brand__mark" aria-hidden="true"><img src="../brand/symbol.svg" alt="" draggable="false" /></span>
+        <span class="brand__name">AgbedePay</span>
+      </a>
+      <div class="topbar__right" data-topbar-right></div>
+    </header>
+
+    <main class="page" id="page">
+      <div class="section-head"><h2>Request money</h2></div>
+      <p class="page-sub">Ask anyone by phone number — they pay straight into your wallet, instantly.</p>
+
+      <form class="form card" id="request-form" novalidate>
+        <div class="error-banner" role="alert"></div>
+
+        <div class="field">
+          <label class="field__label" for="req-phone">Ask who?</label>
+          <input class="input" id="req-phone" name="payerPhone" type="tel" inputmode="numeric" autocomplete="tel" maxlength="11" placeholder="Their phone number, e.g. 08087654321" required />
+          <p class="field__error"></p>
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="req-amount">Amount (₦, whole naira)</label>
+          <input class="input" id="req-amount" name="amount" type="number" min="1" step="1" inputmode="numeric" placeholder="e.g. 1500" required />
+          <p class="field__error"></p>
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="req-note">Note <span style="font-weight:400;color:var(--muted)">— optional</span></label>
+          <input class="input" id="req-note" name="note" type="text" maxlength="160" placeholder="e.g. Rent share" />
+          <p class="field__error"></p>
+        </div>
+
+        <button class="btn btn--green" id="request-submit" type="submit">Request</button>
+      </form>
+
+      <div class="section-head" style="margin-top:20px"><h2>Money you've requested</h2></div>
+      <div id="req-outgoing" class="req-list" aria-live="polite"></div>
+
+      <div class="section-head"><h2>Money others asked you for</h2></div>
+      <div id="req-incoming" class="req-list" aria-live="polite"></div>
+    </main>
+
+
+    <div class="ad-ticker" data-ad-ticker aria-hidden="true"></div>
+
+    <!-- Pay-request PIN modal -->
+    <div class="modal-backdrop" id="pay-modal" hidden>
+      <div class="modal">
+        <h2 class="modal__title" id="pay-title">Pay this request</h2>
+        <p class="modal__text" id="pay-text"></p>
+        <div class="field">
+          <label class="field__label" for="pay-pin">Confirm with your 6-digit PIN</label>
+          <input class="input" id="pay-pin" type="password" inputmode="numeric" maxlength="6" placeholder="••••••" />
+          <p class="field__error" style="display:none;color:var(--danger);font-size:.82rem" id="pay-pin-error"></p>
+        </div>
+        <div class="modal__actions">
+          <button class="ghost-btn" type="button" id="pay-cancel">Cancel</button>
+          <button class="btn btn--green" type="button" id="pay-confirm" style="width:auto">Pay now</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/ui.js"></script>
+  <script src="../js/pages/request.js"></script>
+</body>
+</html>

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Log in — AgbedePay</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="icon" type="image/svg+xml" href="../brand/favicon.svg" />
+</head>
+<body class="auth-body">
+  <main class="auth-card">
+    <div class="brand brand--center">
+      <span class="brand__mark" aria-hidden="true"><img src="../brand/symbol.svg" alt="" draggable="false" /></span>
+      <span class="brand__name">AgbedePay</span>
+    </div>
+
+    <h1 class="auth-title">Welcome back</h1>
+    <p class="auth-sub">Log in to manage your wallet.</p>
+
+    <form class="form" id="login-form" novalidate>
+      <div class="error-banner" role="alert"></div>
+
+      <div id="idp-step">
+        <div class="field">
+          <label class="field__label" for="phone">Phone number</label>
+          <input class="input" id="phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel" maxlength="11" placeholder="e.g. 08012345678" required />
+          <p class="field__error"></p>
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="pin">Transaction PIN</label>
+          <input class="input" id="pin" name="pin" type="password" inputmode="numeric" autocomplete="current-password" maxlength="6" placeholder="••••••" required />
+          <p class="field__error"></p>
+        </div>
+
+        <button class="btn btn--primary" id="login-submit" type="submit">Log in</button>
+
+        <p class="form__footer">
+          <a href="forgot.html">Forgot PIN?</a>
+        </p>
+      </div>
+
+      <div id="otp-step" hidden>
+        <p class="auth-sub" style="margin-bottom:12px">Security code required. Enter the 6-digit code — it's shown once in the server console for this demo.</p>
+        <div class="field">
+          <label class="field__label" for="otp-code">Security code</label>
+          <input class="input" id="otp-code" type="tel" inputmode="numeric" maxlength="6" placeholder="••••••" />
+          <p class="field__error"></p>
+        </div>
+        <button class="btn btn--primary" id="otp-submit" type="button" style="width:100%">Verify &amp; log in</button>
+        <button class="link-btn" id="otp-resend" type="button" style="margin-top:12px">Resend code</button>
+      </div>
+    </form>
+
+    <p class="auth-alt">
+      New to AgbedePay? <a href="register.html">Create an account</a>
+    </p>
+    <p class="auth-sub" style="margin-top:14px">Demo logins: <code>08012345678</code> / <code>08087654321</code> · PIN <code>482913</code></p>
+  </main>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/ui.js"></script>
+  <script src="../js/pages/login.js"></script>
+</body>
+</html>

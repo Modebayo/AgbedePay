@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Add money — AgbedePay</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="icon" type="image/svg+xml" href="../brand/favicon.svg" />
+  <script>try{if(localStorage.getItem("agbe_theme")==="dark")document.documentElement.setAttribute("data-theme","dark")}catch(e){}</script>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <a class="brand" href="dashboard.html">
+        <span class="brand__mark" aria-hidden="true"><img src="../brand/symbol.svg" alt="" draggable="false" /></span>
+        <span class="brand__name">AgbedePay</span>
+      </a>
+      <div class="topbar__right" data-topbar-right></div>
+    </header>
+
+    <main class="page">
+      <h1 class="page-title">Add money</h1>
+      <p class="page-sub">Top up your AgbedePay wallet in seconds.</p>
+
+      <form class="form card" id="fund-form" novalidate>
+        <div class="error-banner" role="alert"></div>
+
+        <div class="field">
+          <label class="field__label" for="amount">Amount (₦, whole naira only)</label>
+          <input class="input" id="amount" name="amount" type="number" min="1" step="1" inputmode="numeric" placeholder="e.g. 10000" required />
+          <p class="field__error"></p>
+        </div>
+
+        <div class="amount-chips" role="group" aria-label="Quick amounts">
+          <button class="chip" type="button" data-amount="1000">₦1,000</button>
+          <button class="chip" type="button" data-amount="5000">₦5,000</button>
+          <button class="chip" type="button" data-amount="10000">₦10,000</button>
+          <button class="chip" type="button" data-amount="20000">₦20,000</button>
+          <button class="chip" type="button" data-amount="50000">₦50,000</button>
+          <button class="chip" type="button" data-amount="100000">₦100,000</button>
+        </div>
+
+        <p id="preview" class="fund-preview"></p>
+
+        <button class="btn btn--green" id="fund-submit" type="submit">Add money</button>
+        <p class="fund-note">Demo build: top-ups are credited instantly through a simulated gateway — no card is charged and nothing is moved.</p>
+      </form>
+    </main>
+
+
+    <div class="ad-ticker" data-ad-ticker aria-hidden="true"></div>
+  </div>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/ui.js"></script>
+  <script src="../js/pages/fund.js"></script>
+</body>
+</html>
