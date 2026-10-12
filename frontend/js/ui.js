@@ -130,8 +130,9 @@ minus: '<path d="M5 12h14"/>',
     target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.6"/>',
     layers: '<path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 13 9 5 9-5"/>',
     clock2: '<path d="M12 7v5l3.5 2"/><path d="M12 3a9 9 0 1 0 9 9 9 9 0 0 0-9-9Z"/>',
-    close: '<path d="M6 6 18 18"/><path d="M18 6 6 18"/>',
-    };
+     close: '<path d="M6 6 18 18"/><path d="M18 6 6 18"/>',
+     logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',
+     };
 
   function icon(name, extraClass = "") {
     const body = ICONS[name];
@@ -229,6 +230,9 @@ minus: '<path d="M5 12h14"/>',
           <div class="topbar__name">${escapeHtml(profile.fullName)}</div>
           <div class="topbar__phone">${escapeHtml(profile.phone)}</div>
         </div>
+        <button class="topbar__logout" type="button" data-logout title="Log out" aria-label="Log out">
+          ${icon("logout")}
+        </button>
         ${avatarHtml(profile)}`;
       const toggle = topbarRight.querySelector("[data-theme-toggle]");
       if (toggle) {
@@ -242,6 +246,8 @@ minus: '<path d="M5 12h14"/>',
           } catch (_) {}
         });
       }
+      const logoutBtn = topbarRight.querySelector("[data-logout]");
+      if (logoutBtn) logoutBtn.addEventListener("click", confirmLogout);
       wireNotifications(topbarRight);
     }
   }
@@ -438,6 +444,12 @@ minus: '<path d="M5 12h14"/>',
       });
   }
 
+  // Ask before dropping the session — a stray tap on the topbar icon should not
+  // silently sign the user out of a page mid-task.
+  function confirmLogout() {
+    if (window.confirm("Log out of AgbedePay?")) logout();
+  }
+
   // Compact "recent purchases" strip used by the airtime and bills pages.
   // Shows the last 5 ledger rows of a given type, linking to their details.
   const RECENT_ICONS = {
@@ -623,6 +635,7 @@ minus: '<path d="M5 12h14"/>',
     renderShell,
     requireAuth,
     logout,
+    confirmLogout,
     loadRecentPurchases,
     renderAdTicker,
     stepper,

@@ -293,6 +293,12 @@
           <li class="limits-list__item"><span>Bonuses earned</span><strong data-ref-bonus>—</strong></li>
         </ul>
       </div>
+
+      <div class="card" style="margin-top:18px">
+        <div class="section-head" style="margin:0 0 8px"><h2>Account</h2></div>
+        <p class="page-sub" style="margin:0 0 14px">You are signed in as <strong>${ui.escapeHtml(currentProfile.phone)}</strong>.</p>
+        <button class="btn btn--danger" id="logout-btn" type="button">${ui.icon("logout")} Log out</button>
+      </div>
     `;
 
     wireSecurity();
@@ -301,6 +307,7 @@
     wireIdentity(kyc);
     wirePinChange();
     wirePicture();
+    ui.$("#logout-btn")?.addEventListener("click", ui.confirmLogout);
   }
 
   // ---- Profile picture -------------------------------------------------------

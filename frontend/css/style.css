@@ -158,6 +158,15 @@ input { font: inherit; }
 .btn--green { background: var(--green); color: #fff; box-shadow: 0 10px 24px -10px rgba(18, 183, 106, 0.6); }
 .btn--green:hover { background: var(--green-dark); }
 
+.btn--danger {
+  background: rgba(229, 72, 77, 0.1);
+  color: var(--danger);
+  border-color: rgba(229, 72, 77, 0.35);
+  gap: 8px;
+}
+.btn--danger:hover { background: rgba(229, 72, 77, 0.16); }
+.btn--danger .ic { width: 18px; height: 18px; }
+
 /* ---------- Auth pages (login / register) ---------- */
 .auth-body {
   display: flex;
@@ -1230,6 +1239,24 @@ html[data-theme="dark"] .btn--ghost {
   flex: none;
 }
 .theme-toggle .ic { width: 18px; height: 18px; }
+
+/* ---------- Topbar log-out button ---------- */
+.topbar__logout {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--white);
+  color: var(--ink);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex: none;
+  transition: all 0.12s ease;
+}
+.topbar__logout:hover { border-color: var(--danger); color: var(--danger); }
+.topbar__logout .ic { width: 18px; height: 18px; }
 
 /* ---------- Fund / add money page ---------- */
 .amount-chips {
