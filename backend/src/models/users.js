@@ -66,8 +66,8 @@ export async function rename(phone, fullName) {
 
 export async function createUser({ fullName, phone, email, pinHash, referralCode }) {
   const { rows } = await query(
-    `INSERT INTO users (full_name, phone, email, pin_hash, referral_code)
-     VALUES ($1, $2, $3, $4, COALESCE($5, upper(substr(md5(gen_random_uuid()::text), 1, 8))))
+    `INSERT INTO users (full_name, phone, email, pin_hash, referral_code, status, is_verified)
+     VALUES ($1, $2, $3, $4, COALESCE($5, upper(substr(md5(gen_random_uuid()::text), 1, 8))), 'ACTIVE', true)
      RETURNING id, full_name, phone, email, status, is_verified, referral_code, created_at`,
     [fullName, phone, email ?? null, pinHash, referralCode ?? null]
   );

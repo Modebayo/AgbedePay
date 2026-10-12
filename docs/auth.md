@@ -25,6 +25,10 @@ profile response.
 
 ## 3. OTP — one-time, short-lived, hash-stored
 
+> Account **registration does not use an OTP**: a new account is active and
+> signed in immediately. OTP codes are still used for **PIN reset** and the
+> optional **login security code**.
+
 - Generated on the server, **hashed with SHA-256**, only the hash is stored.
   (Fast hash is acceptable here — codes are random 6-digit values, expire in
   15 min, and raise an error after 5 attempts.)
@@ -56,7 +60,8 @@ profile response.
    From the project root, restart the API: `npm run dev`.
    - **No key / missing sender ID** → server refuses to start with a clear
      message (`SMS_PROVIDER=termii requires TERMII_API_KEY and TERMII_SENDER_ID`).
-3. Trigger a code: register → the code is delivered to the phone as a real SMS.
+3. Trigger a code: start a PIN reset (`forgot-pin`) or enable the login security
+   code → the code is delivered to the phone as a real SMS.
    - The number is converted to international format (`08012345678` →
      `2348012345678`), and the **`dnd` (transactional) route** is used — Termii
      requires this for OTP codes (the generic route doesn't deliver to DND

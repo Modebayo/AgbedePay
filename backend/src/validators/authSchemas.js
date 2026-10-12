@@ -10,16 +10,6 @@ export const registerSchema = {
   referralCode: ["optional", "string", ["minLen", 6], ["maxLen", 12]],
 };
 
-export const verifyOtpSchema = {
-  phone: ["required", "string", "phone"],
-  code: ["required", "string", "code"],
-};
-
-export const resendOtpSchema = {
-  phone: ["required", "string", "phone"],
-  purpose: ["required", "string", "purpose"],
-};
-
 export const loginSchema = {
   phone: ["required", "string", "phone"],
   pin: ["required", "string", "pin"],

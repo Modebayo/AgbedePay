@@ -43,7 +43,9 @@ export async function register({ fullName, phone, email, pin, confirmPin, ipAddr
     await referralModel.createReferral({ referrerId: referrer.id, referredId: user.id });
   }
 
-  await issueOtp({ phone, purpose: "REGISTRATION" });
+  // No OTP / verification step: the account is active the moment it is created,
+  // so we sign the holder straight in.
+  const verified = await userModel.setVerified(user.id);
 
   await auditModel.record({
     userId: user.id,
@@ -55,27 +57,8 @@ export async function register({ fullName, phone, email, pin, confirmPin, ipAddr
     userAgent,
   });
 
-  return { userId: user.id, status: user.status, referralCode: user.referral_code };
-}
-
-export async function verifyRegistrationOtp({ phone, code, ipAddress, userAgent }) {
-  await consumeOtp({ phone, purpose: "REGISTRATION", code });
-  const user = await userModel.findByPhone(phone);
-  if (!user) throw new ApiError(404, "User not found", ErrorCodes.NOT_FOUND);
-
-  const updated = await userModel.setVerified(user.id);
-
-  await auditModel.record({
-    userId: user.id,
-    action: "OTP_VERIFIED",
-    entityType: "USER",
-    entityId: user.id,
-    metadata: { purpose: "REGISTRATION" },
-    ipAddress,
-    userAgent,
-  });
-
-  return { userId: user.id, status: updated.status, isVerified: updated.is_verified };
+  const session = await createSession({ ...user, ...verified }, { ipAddress, userAgent });
+  return { ...session, referralCode: user.referral_code };
 }
 
 // ---------- Login / logout ----------
@@ -324,21 +307,6 @@ export async function resetPin({ phone, code, pin, confirmPin, ipAddress, userAg
   });
 
   return { message: "PIN reset successful. Please log in again." };
-}
-
-export async function resendOtp({ phone, purpose, ipAddress, userAgent }) {
-  const user = await userModel.findByPhone(phone);
-  if (!user) throw new ApiError(404, "User not found", ErrorCodes.NOT_FOUND);
-
-  await issueOtp({ phone, purpose });
-  await auditModel.record({
-    userId: user.id,
-    action: "OTP_RESEND",
-    metadata: { purpose },
-    ipAddress,
-    userAgent,
-  });
-  return { message: "A new code has been issued (see server console — DEV/MOCK)." };
 }
 
 // ---------- Change PIN (while logged in) ----------

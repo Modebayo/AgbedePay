@@ -26,8 +26,8 @@ import { OtpProvider } from "./otpProvider.js";
 import { ApiError } from "../utils/errors.js";
 
 const MESSAGE_FOR_PURPOSE = {
-  REGISTRATION: "to complete your AgbedePay account registration",
   FORGOT_PIN: "to reset your AgbedePay PIN",
+  LOGIN: "to sign in to AgbedePay",
 };
 
 // "08012345678" -> "2348012345678" (Termii needs international format).

@@ -29,16 +29,12 @@ function clearSessionCookie(res) {
 
 export const register = asyncHandler(async (req, res) => {
   const data = await authService.register({ ...req.body, ...reqCtx(req) });
+  if (data.token) setSessionCookie(res, data.token);
   res.status(201).json({
     success: true,
     data,
-    message: "Registration started — a DEV/MOCK verification code was printed to the server console.",
+    message: "Account created — you are now signed in.",
   });
-});
-
-export const verifyOtp = asyncHandler(async (req, res) => {
-  const data = await authService.verifyRegistrationOtp({ ...req.body, ...reqCtx(req) });
-  res.json({ success: true, data, message: "Phone number verified. You can now log in." });
 });
 
 export const login = asyncHandler(async (req, res) => {
@@ -103,11 +99,6 @@ export const forgotPin = asyncHandler(async (req, res) => {
 
 export const resetPin = asyncHandler(async (req, res) => {
   const data = await authService.resetPin({ ...req.body, ...reqCtx(req) });
-  res.json({ success: true, data });
-});
-
-export const resendOtp = asyncHandler(async (req, res) => {
-  const data = await authService.resendOtp({ ...req.body, ...reqCtx(req) });
   res.json({ success: true, data });
 });
 

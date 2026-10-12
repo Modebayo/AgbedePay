@@ -1,5 +1,5 @@
-// register page — creates the account, then sends the user to verify.html.
-// The backend prints a DEV/MOCK OTP to its console (there is no real SMS).
+// register page — creates the account and signs the user straight in.
+// There is no OTP / verification step: new accounts are active immediately.
 
 (function () {
   "use strict";
@@ -45,8 +45,8 @@
         body: payload,
         headers: { "Idempotency-Key": idempotencyKey() },
       });
-      ui.toast("Account created — check the server console for your code", "success");
-      window.location.replace(`verify.html?phone=${encodeURIComponent(payload.phone)}`);
+      ui.toast("Account created — welcome!", "success");
+      window.location.replace("dashboard.html");
     } catch (err) {
       ui.showFormErrors(form, err);
     } finally {

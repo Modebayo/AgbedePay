@@ -70,9 +70,6 @@ export const rules = {
     args: true,
     run: (v, [allowed]) => Array.isArray(allowed) && allowed.includes(v),
   },
-  purpose: {
-    run: (v) => v === "REGISTRATION" || v === "FORGOT_PIN" || v === "LOGIN",
-  },
   // Strict boolean (sent as JSON true/false, never truthy strings).
   bool: {
     run: (v) => typeof v === "boolean",

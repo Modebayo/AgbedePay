@@ -118,7 +118,6 @@ Base URL: `/api`
 
 ```
 Auth:        POST /api/auth/register
-             POST /api/auth/verify-otp
              POST /api/auth/login
              POST /api/auth/logout
              POST /api/auth/forgot-pin
@@ -213,8 +212,8 @@ wallets N───N wallets  via transactions (sender_wallet_id -> receiver_wall
 | phone | VARCHAR(20) UNIQUE NN | login identity |
 | email | VARCHAR(255) UNIQUE NULL | optional |
 | pin_hash | TEXT NN | Argon2id hash, never plaintext |
-| status | VARCHAR(20) NN | ACTIVE \| SUSPENDED \| DISABLED \| PENDING_VERIFICATION |
-| is_verified | BOOLEAN NN | true after OTP |
+| status | VARCHAR(20) NN | ACTIVE \| SUSPENDED \| DISABLED |
+| is_verified | BOOLEAN NN | true from account creation |
 | created_at / updated_at | TIMESTAMPTZ | |
 
 **wallets** — where money lives.
@@ -270,20 +269,21 @@ created_at. Immutable record of security & financial events. Never contains secr
 
 Flow:
 1. **Register** → validate input → check phone unused → create user
-   (`PENDING_VERIFICATION`) with Argon2id-hashed PIN → create wallet → generate a
-   6-digit OTP → store only its SHA-256 hash → call the SMS provider.
-2. **Mock OTP provider** prints the code to the server console and labels it
-   `[DEV/MOCK OTP]`. It never claims an SMS was sent. The OTP service has a common
-   interface so a real SMS provider (Twilio, etc.) can be added later.
-3. **Verify OTP** → check expiry (15 min), attempts (<5), match hash, then mark
-   `consumed_at`, set `is_verified=true`, user → `ACTIVE`.
-4. **Login** → rate limit (max 5 fails / 15 min per phone+IP) → verify phone+pin →
+   (`ACTIVE`, verified) with Argon2id-hashed PIN → create wallet → sign the user
+   in immediately (no OTP / verification step).
+2. **Login** → rate limit (max 5 fails / 15 min per phone+IP) → verify phone+pin →
    create opaque session token (256-bit random) → store its SHA-256 hash in
    `sessions` → send token to the browser.
-5. **Auth middleware** reads the token on every protected endpoint, looks up the
+3. **Auth middleware** reads the token on every protected endpoint, looks up the
    session hash, checks expiry/revocation, attaches `req.user` + `req.session`.
    Ownership is ALWAYS derived from the server-side session — never from a
    client-supplied `user_id`.
+
+OTPs are still used for **PIN reset** and the optional **login security code**:
+the code is generated on the server, only its SHA-256 hash is stored, and it
+expires after 15 min / 5 attempts. The mock provider prints `[DEV/MOCK OTP]` to
+the server console; the interface allows a real SMS provider (Termii) to be
+swapped in via `SMS_PROVIDER` with no code changes.
 
 Token delivery: an `httpOnly` + `SameSite=Strict` cookie for MVP (or
 `Authorization: Bearer` header for cross-origin API use). The frontend never reads
@@ -383,7 +383,7 @@ vendor logic into services.
   when we implement it).
 - `helmet` security headers; `SameSite=Strict` cookies; CSRF protection for
   state-changing requests.
-- Rate limits: login, OTP (generate + verify), send money, register.
+- Rate limits: login, OTP (forgot PIN / login code), send money, register.
 - Input validation on **every** endpoint (types, lengths, phone format, amounts,
   ids) — backend validation is security, frontend validation is just UX.
 - Audit logging of security + financial events (never PINs/OTPs/tokens).
