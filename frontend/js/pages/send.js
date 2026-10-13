@@ -111,13 +111,15 @@
       if (banksLoaded) return;
       try {
         const res = await api("/transactions/banks");
+        // The API returns plain bank-name strings; tolerate {name} objects too.
         (res.banks || [])
-          .slice()
-          .sort((a, b) => a.name.localeCompare(b.name))
-          .forEach((b) => {
+          .map((b) => (typeof b === "string" ? b : b && b.name))
+          .filter(Boolean)
+          .sort((a, b) => a.localeCompare(b, "en", { sensitivity: "base" }))
+          .forEach((name) => {
             const opt = document.createElement("option");
-            opt.value = b.name;
-            opt.textContent = b.name;
+            opt.value = name;
+            opt.textContent = name;
             bankSelect.appendChild(opt);
           });
         banksLoaded = true;
@@ -142,6 +144,7 @@
         previewEl.textContent = "";
       }
     }
+    ui.moneyInput(amountEl);
     amountEl.addEventListener("input", refreshPreview);
 
     const form = ui.$("#send-form");

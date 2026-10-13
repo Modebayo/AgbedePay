@@ -87,7 +87,7 @@
 
         <div class="field">
           <label class="field__label" for="wd-amount">Amount (₦, whole naira)</label>
-          <input class="input" id="wd-amount" name="amount" type="number" min="1" step="1" inputmode="numeric" placeholder="e.g. 5000" required />
+          <input class="input" id="wd-amount" name="amount" type="number" min="1" step="1" inputmode="numeric" maxlength="12" placeholder="e.g. 5000" required />
           <p class="field__error"></p>
         </div>
         <p class="field__hint" data-preview style="display:none"></p>
@@ -161,6 +161,7 @@
     const amount = ui.$("#wd-amount");
     const preview = ui.$("[data-preview]");
     if (!amount || !preview) return;
+    ui.moneyInput(amount);
     amount.addEventListener("input", () => {
       const v = Number.parseInt(amount.value, 10);
       if (v > 0) {

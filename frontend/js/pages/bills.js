@@ -24,7 +24,11 @@
     try {
       catalog = await api("/bills/providers");
       renderTabs();
-      showTab("electricity");
+      // Deep-link support: bills.html?tab=data (the Home "Data" tile) opens the
+      // Mobile data tab directly, falling back to electricity for a bad value.
+      const requested = new URLSearchParams(window.location.search).get("tab");
+      const valid = TABS.some(([key]) => key === requested);
+      showTab(valid ? requested : "electricity");
     } catch (err) {
       page.innerHTML = `<div class="error-banner error-banner--show" role="alert">${ui.escapeHtml(err.message)}</div>`;
     }
@@ -99,7 +103,7 @@
 
         <div class="field">
           <label class="field__label" for="elec-amount">Amount (₦)</label>
-          <input class="input" id="elec-amount" name="amount" type="number" min="1" step="1" inputmode="numeric" placeholder="e.g. 5000" required />
+          <input class="input" id="elec-amount" name="amount" type="number" min="1" step="1" inputmode="numeric" maxlength="12" placeholder="e.g. 5000" required />
           <p class="field__error"></p>
           <p class="balance-hint" id="elec-hint" hidden></p>
         </div>
@@ -121,21 +125,16 @@
       <div id="elec-success" hidden></div>
     `;
 
-    ui.$$("#elec-form input[type='number'], #elec-form input[type='tel']").forEach((i) => {
+    ui.$$("#elec-form input[type='tel']").forEach((i) => {
       i.addEventListener("input", () => {
         i.value = i.value.replace(/\D/g, "");
       });
     });
 
     const amount = ui.$("#elec-amount");
+    ui.moneyInput(amount);
     amount.addEventListener("input", () => {
-      const v = Number.parseInt(amount.value, 10);
-      const hint = ui.$("#elec-hint");
-      if (v > 0) {
-        hint.textContent = `New balance: ${ui.formatNgn((wallet.balanceMinor - v * 100) / 100)}`;
-        hint.style.color = v * 100 > wallet.balanceMinor ? "var(--danger)" : "";
-        hint.hidden = false;
-      } else hint.hidden = true;
+      ui.balanceHint(ui.$("#elec-hint"), wallet.balanceMinor, Number.parseInt(amount.value, 10));
     });
 
     const pin = ui.$("#elec-pin");
@@ -368,7 +367,7 @@
         <div class="field">
           <label class="field__label">Subscription package</label>
           <div class="plan-list" id="cable-plan-list">
-            <p class="page-sub">Look up your decoder, then pick a package.</p>
+            <p class="page-sub">Choose a provider, then pick a package.</p>
           </div>
           <p class="field__error"></p>
         </div>
@@ -395,8 +394,35 @@
       decoder.value = decoder.value.replace(/\D/g, "");
     });
 
+    function renderCablePlans(provider) {
+      const list = ui.$("#cable-plan-list");
+      const providerData = catalog.cable.providers.find((p) => p.provider === provider);
+      if (!providerData) {
+        list.innerHTML = `<p class="page-sub">Choose a provider, then pick a package.</p>`;
+        return;
+      }
+      list.innerHTML = providerData.plans
+        .map(
+          (p) => `
+            <label class="plan">
+              <input class="plan__radio" type="radio" name="planId" value="${ui.escapeHtml(p.planId)}" />
+              <span class="plan__main">${ui.escapeHtml(p.label)}</span>
+              <span class="plan__price">${ui.escapeHtml(p.amountNgn)}</span>
+            </label>`
+        )
+        .join("");
+    }
+
+    // Packages are listed as soon as a provider is picked — the account lookup
+    // below only confirms the holder's name.
+    const providerSelect = ui.$("#cable-provider");
+    providerSelect.addEventListener("change", () => {
+      ui.$("#cable-account").innerHTML = "";
+      renderCablePlans(providerSelect.value);
+    });
+
     ui.$("#cable-lookup").addEventListener("click", async () => {
-      const provider = ui.$("#cable-provider").value;
+      const provider = providerSelect.value;
       const decoderNo = decoder.value;
       if (!provider || decoderNo.length < 6) {
         ui.toast("Select a provider and enter a valid decoder number", "error");
@@ -415,17 +441,7 @@
             <span class="account-hit__dot" aria-hidden="true"></span>
             <div><strong>${ui.escapeHtml(name)}</strong><div class="account-hit__meta">${ui.escapeHtml(provider)} · ${ui.escapeHtml(decoderNo)}</div></div>
           </div>`;
-        const providerData = catalog.cable.providers.find((p) => p.provider === provider);
-        ui.$("#cable-plan-list").innerHTML = providerData.plans
-          .map(
-            (p) => `
-              <label class="plan">
-                <input class="plan__radio" type="radio" name="planId" value="${ui.escapeHtml(p.planId)}" />
-                <span class="plan__main">${ui.escapeHtml(p.label)}</span>
-                <span class="plan__price">${ui.escapeHtml(p.amountNgn)}</span>
-              </label>`
-          )
-          .join("");
+        renderCablePlans(provider);
       } catch (err) {
         ui.toast(err.message || "Lookup failed", "error");
       } finally {

@@ -147,7 +147,7 @@
       <div class="stats-dash" data-savings-stats>
         <div class="stat-card">
           <div class="stat-card__label">Total saved</div>
-          <div class="stat-card__value" data-saved>${ui.escapeHtml(ui.formatNgn(totalSavedMinor))}</div>
+          <div class="stat-card__value" data-saved>${ui.escapeHtml(ui.formatNgn(totalSavedMinor / 100))}</div>
         </div>
         <div class="stat-card">
           <div class="stat-card__label">Savings goals</div>
@@ -199,6 +199,7 @@
       <div class="quick-actions">
         <a class="quick-action" href="send.html"><span class="quick-action__icon" aria-hidden="true">${ui.icon("send")}</span><span>Send</span></a>
         <a class="quick-action" href="airtime.html"><span class="quick-action__icon" aria-hidden="true">${ui.icon("airtime")}</span><span>Airtime</span></a>
+        <a class="quick-action" href="bills.html?tab=data"><span class="quick-action__icon" aria-hidden="true">${ui.icon("data")}</span><span>Data</span></a>
         <a class="quick-action" href="bills.html"><span class="quick-action__icon" aria-hidden="true">${ui.icon("bills")}</span><span>Bills</span></a>
         <a class="quick-action" href="betting.html"><span class="quick-action__icon" aria-hidden="true">${ui.icon("betting")}</span><span>Betting</span></a>
         <a class="quick-action" href="savings.html"><span class="quick-action__icon" aria-hidden="true">${ui.icon("savings")}</span><span>Savings</span></a>
@@ -224,9 +225,7 @@
           RIDE: "car",
         };
         const icon = ui.icon(typeIcons[t.type] || "wallet");
-        const credit = t.receiver?.walletId === w.id;
-        const dir = credit ? "CREDIT" : "DEBIT";
-        const sign = credit ? "+" : "-";
+        const { dir, sign } = ui.txDirection(t, w.id);
         return `
           <a class="tx-item" href="transaction.html?id=${encodeURIComponent(t.id)}">
             <div class="tx-item__icon" aria-hidden="true">${icon}</div>
@@ -388,7 +387,7 @@
           <div class="error-banner" role="alert"></div>
           <div class="field">
             <label class="field__label" for="dep-amount">Amount (₦, whole naira)</label>
-            <input class="input" id="dep-amount" name="amount" type="number" min="1" step="1" inputmode="numeric" placeholder="e.g. 5000" required />
+            <input class="input" id="dep-amount" name="amount" type="number" min="1" step="1" inputmode="numeric" maxlength="12" placeholder="e.g. 5000" required />
           </div>
           <div class="field">
             <label class="field__label" for="dep-pin">Confirm with your 6-digit PIN</label>
@@ -409,6 +408,7 @@
     pin.addEventListener("input", () => {
       pin.value = pin.value.replace(/\D/g, "").slice(0, 6);
     });
+    ui.moneyInput(backdrop.querySelector("#dep-amount"));
 
     backdrop.querySelector("#deposit-form").addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -455,7 +455,7 @@
 
     const saved = goals.reduce((sum, g) => sum + (g.currentAmountMinor || 0), 0);
     const savedEl = page.querySelector("[data-saved]");
-    if (savedEl) savedEl.textContent = ui.formatNgn(saved);
+    if (savedEl) savedEl.textContent = ui.formatNgn(saved / 100);
     const countEl = page.querySelector("[data-goals-count]");
     if (countEl) countEl.textContent = String(goals.length);
 

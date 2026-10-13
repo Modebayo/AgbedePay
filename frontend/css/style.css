@@ -252,7 +252,7 @@ textarea.input { padding: 12px 14px; min-height: 84px; resize: vertical; }
 .notice strong { display: block; font-weight: 700; }
 
 /* ---------- App shell ---------- */
-.app { max-width: 1080px; margin: 0 auto; padding: 0 16px 168px; }
+.app { max-width: 1080px; margin: 0 auto; padding: 0 16px calc(var(--bottomnav-h, 60px) + 108px); }
 
 .topbar {
   display: flex;
@@ -360,7 +360,7 @@ textarea.input { padding: 12px 14px; min-height: 84px; resize: vertical; }
   position: fixed;
   left: 0;
   right: 0;
-  bottom: 62px;
+  bottom: var(--bottomnav-h, 62px);
   z-index: 55;
   height: 40px;
   display: flex;
@@ -872,14 +872,14 @@ textarea.input { padding: 12px 14px; min-height: 84px; resize: vertical; }
 }
 
 @media (min-width: 900px) {
-  .app { padding-bottom: 148px; }
+  .app { padding-bottom: calc(var(--bottomnav-h, 60px) + 88px); }
   .topbar { flex-wrap: nowrap; }
   .balance-card__amount { font-size: 2.7rem; }
 }
 
 /* ---------- Mobile (phones) ---------- */
 @media (max-width: 520px) {
-  .app { padding: 0 12px 170px; }
+  .app { padding: 0 12px calc(var(--bottomnav-h, 60px) + 110px); }
   .topbar { padding: 12px 0 10px; gap: 8px; }
   .topbar__person { display: none; }
   .topbar__right { gap: 8px; }

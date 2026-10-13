@@ -28,8 +28,8 @@
       </div>
 
       <div class="send-methods" role="tablist" aria-label="Send method">
-        <button class="send-method is-active" type="button" data-method="wallet" role="tab" aria-selected="true">To wallet</button>
-        <button class="send-method" type="button" data-method="bank" role="tab" aria-selected="false">To bank account</button>
+        <button class="send-method is-active" type="button" data-method="wallet" role="tab" aria-selected="true">To AgbedePay</button>
+        <button class="send-method" type="button" data-method="bank" role="tab" aria-selected="false">Other bank</button>
       </div>
 
       <form class="form card" id="send-form" novalidate>
@@ -60,7 +60,7 @@
 
         <div class="field">
           <label class="field__label" for="amount">Amount (₦, whole naira only)</label>
-          <input class="input" id="amount" name="amount" type="number" min="1" step="1" inputmode="numeric" placeholder="e.g. 5000" required />
+          <input class="input" id="amount" name="amount" type="number" min="1" step="1" inputmode="numeric" maxlength="12" placeholder="e.g. 5000" required />
           <p class="field__error"></p>
           <p id="preview" style="margin-top:4px;font-size:0.88rem;color:var(--muted);"></p>
         </div>

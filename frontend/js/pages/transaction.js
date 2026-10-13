@@ -42,12 +42,7 @@
   });
 
   function render(t, receiptData) {
-    const dir =
-      t.type === "FUNDING"
-        ? { label: "Money in", sign: "+", cls: "credit" }
-        : t.receiver?.walletId === current.id
-          ? { label: "Money in", sign: "+", cls: "credit" }
-          : { label: "Money out", sign: "-", cls: "debit" };
+    const dir = ui.txDirection(t, current.id);
 
     const parties =
       t.type === "FUNDING"

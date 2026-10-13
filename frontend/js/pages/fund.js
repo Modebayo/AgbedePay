@@ -23,6 +23,7 @@
     const form = ui.$("#fund-form");
     const submit = ui.$("#fund-submit");
 
+    ui.moneyInput(amount);
     const refreshAmount = () => {
       const v = Number.parseInt(amount.value, 10);
       preview.textContent =

@@ -23,10 +23,9 @@
     done: false,
   };
 
-  const isType = (f) => ["TRANSFER", "AIRTIME", "BILLS", "BETTING", "SAVINGS_DEPOSIT", "FUNDING", "WITHDRAWAL", "BANK"].includes(f);
-  const isOut = (t) =>
-    ["AIRTIME", "BILLS", "BETTING", "SAVINGS_DEPOSIT", "BANK"].includes(t.type) ||
-    (t.type === "TRANSFER" && t.receiver?.walletId !== state.walletId);
+  const TX_TYPES = ["TRANSFER", "AIRTIME", "BILLS", "BETTING", "SAVINGS_DEPOSIT", "SAVINGS_WITHDRAWAL", "FUNDING", "WITHDRAWAL", "BANK", "DISPATCH", "RIDE", "WEALTH_BUY", "WEALTH_SELL", "REVERSAL"];
+  const isType = (f) => TX_TYPES.includes(f);
+  const isOut = (t) => !ui.txDirection(t, state.walletId).credit;
   const matches = (t) =>
     state.filter === "ALL" ||
     (state.filter === "IN" && !isOut(t)) ||
@@ -42,7 +41,7 @@
     const query = new URLSearchParams(window.location.search);
     const fromUrl = query.get("type");
     const sortFromUrl = query.get("sort");
-    if (fromUrl && ["TRANSFER", "AIRTIME", "BILLS", "BETTING", "SAVINGS_DEPOSIT", "FUNDING", "WITHDRAWAL", "BANK"].includes(fromUrl)) {
+    if (fromUrl && isType(fromUrl)) {
       state.filter = fromUrl;
     }
     if (sortFromUrl && ["newest", "oldest", "amount_hi", "amount_lo"].includes(sortFromUrl)) {
@@ -170,10 +169,16 @@
       FUNDING: "funding",
       REVERSAL: "reverse",
       SAVINGS_DEPOSIT: "savings",
+      SAVINGS_WITHDRAWAL: "savings",
       AIRTIME: "airtime",
       BILLS: "bills",
       BETTING: "betting",
+      WITHDRAWAL: "bank",
       BANK: "bank",
+      DISPATCH: "box",
+      RIDE: "car",
+      WEALTH_BUY: "wealth",
+      WEALTH_SELL: "wealth",
     };
     const credit = !isOut(t);
     const dir = credit ? "credit" : "debit";

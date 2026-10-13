@@ -54,7 +54,7 @@
 
         <div class="field">
           <label class="field__label" for="air-amount">Amount (₦)</label>
-          <input class="input" id="air-amount" name="amount" type="number" min="1" step="1" inputmode="numeric" placeholder="e.g. 1000" required />
+          <input class="input" id="air-amount" name="amount" type="number" min="1" step="1" inputmode="numeric" maxlength="12" placeholder="e.g. 1000" required />
           <p class="field__error"></p>
           <p class="balance-hint" id="air-hint"></p>
         </div>
@@ -83,17 +83,9 @@
     });
 
     const amount = ui.$("#air-amount");
+    ui.moneyInput(amount);
     amount.addEventListener("input", () => {
-      const v = Number.parseInt(amount.value, 10);
-      const hint = ui.$("#air-hint");
-      if (!hint) return;
-      if (v > 0) {
-        hint.textContent = `New balance: ${ui.formatNgn((wallet.balanceMinor - v * 100) / 100)}`;
-        hint.style.color = v * 100 > wallet.balanceMinor ? "var(--danger)" : "";
-        hint.hidden = false;
-      } else {
-        hint.hidden = true;
-      }
+      ui.balanceHint(ui.$("#air-hint"), wallet.balanceMinor, Number.parseInt(amount.value, 10));
     });
 
     const pin = ui.$("#air-pin");

@@ -76,6 +76,7 @@
     withdraw: '<path d="M7 7l10 10"/><path d="M16 7H7v9"/>',
     savings: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/>',
     wifi: '<path d="M4 10.5a11 11 0 0 1 16 0"/><path d="M7 13.5a7 7 0 0 1 10 0"/><path d="M10 16.5a3 3 0 0 1 4 0"/><circle cx="12" cy="19.3" r="1.3"/>',
+    data: '<rect x="6" y="3" width="12" height="18" rx="2.5"/><path d="M9.5 3v4.5h5V3"/><path d="M9.5 12.5h5v4h-5z"/>',
     tv: '<rect x="3" y="6.5" width="18" height="12" rx="2"/><path d="m8 2.5 4 4 4-4"/>',
     plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
     sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
@@ -148,6 +149,53 @@ minus: '<path d="M5 12h14"/>',
       currency: "NGN",
       minimumFractionDigits: 2,
     }).format(nairaNumber);
+  }
+
+  // Money amounts are whole naira typed by the user. Force digits-only so
+  // decimals ("12.9"), signs and exponent notation can never reach parseInt and
+  // silently round the amount down to something the user didn't type.
+  const MONEY_MAX_DIGITS = 12;
+  function moneyInput(el) {
+    if (!el) return;
+    el.addEventListener("input", () => {
+      const digits = el.value.replace(/\D/g, "").slice(0, MONEY_MAX_DIGITS);
+      if (digits !== el.value) el.value = digits;
+    });
+  }
+
+  // One safe balance hint for every "amount (₦)" field. When the amount exceeds
+  // the wallet we say so instead of rendering a giant negative "new balance".
+  function balanceHint(hintEl, balanceMinor, nairaAmount) {
+    if (!hintEl) return;
+    if (!Number.isInteger(nairaAmount) || nairaAmount <= 0) {
+      hintEl.hidden = true;
+      return;
+    }
+    hintEl.hidden = false;
+    if (nairaAmount * 100 > balanceMinor) {
+      hintEl.textContent = `Insufficient balance — you have ${formatNgn(balanceMinor / 100)}.`;
+      hintEl.style.color = "var(--danger)";
+    } else {
+      hintEl.textContent = `New balance: ${formatNgn((balanceMinor - nairaAmount * 100) / 100)}`;
+      hintEl.style.color = "";
+    }
+  }
+
+  // Direction of a money movement for the CURRENT user. The canonical rule
+  // mirrors the backend: the wallet is debited unless it is the receiver (or the
+  // movement is a top-up / savings payout, which credit the wallet even though
+  // their ledger row records the wallet as the sender).
+  const CREDIT_TYPES = new Set(["FUNDING", "SAVINGS_WITHDRAWAL"]);
+  function txDirection(t, walletId) {
+    const credit =
+      CREDIT_TYPES.has(t.type) ||
+      (t.sender ? t.sender.walletId !== walletId : true);
+    return {
+      credit,
+      dir: credit ? "credit" : "debit",
+      sign: credit ? "+" : "-",
+      label: credit ? "Money in" : "Money out",
+    };
   }
 
   function toast(message, type = "info") {
@@ -285,6 +333,17 @@ minus: '<path d="M5 12h14"/>',
           <span class="bottomnav__label">${label}</span>
         </a>`
     ).join("");
+
+    // Publish the nav's real rendered height so the fixed ad ticker sits exactly
+    // on top of it and the page reserves enough space below. A hard-coded offset
+    // drifts when the nav grows (safe-area insets, larger fonts, an extra tab).
+    const syncNavHeight = (el) =>
+      document.documentElement.style.setProperty("--bottomnav-h", `${(el || nav).offsetHeight}px`);
+    syncNavHeight(nav);
+    if (!window.__agbeNavResizeBound) {
+      window.__agbeNavResizeBound = true;
+      window.addEventListener("resize", () => syncNavHeight(document.querySelector("[data-bottomnav]")));
+    }
   }
 
   // ---- Notifications bell + tray -------------------------------------------
@@ -481,7 +540,9 @@ minus: '<path d="M5 12h14"/>',
         return;
       }
       el.innerHTML = items
-        .map((t) => `
+        .map((t) => {
+          const credit = CREDIT_TYPES.has(type);
+          return `
           <a class="tx-item" href="transaction.html?id=${encodeURIComponent(t.id)}">
             <div class="tx-item__icon" aria-hidden="true">${icon(RECENT_ICONS[type] || "wallet")}</div>
             <div class="tx-item__main">
@@ -492,9 +553,10 @@ minus: '<path d="M5 12h14"/>',
               </div>
             </div>
             <div class="tx-item__right">
-              <div class="tx-item__amount tx-item__amount--debit">-${t.amountNgn}</div>
+              <div class="tx-item__amount tx-item__amount--${credit ? "credit" : "debit"}">${credit ? "+" : "-"}${t.amountNgn}</div>
             </div>
-          </a>`)
+          </a>`;
+        })
         .join("");
       if (total > 5) {
         el.insertAdjacentHTML(
@@ -628,6 +690,9 @@ minus: '<path d="M5 12h14"/>',
     initialsOf,
     avatarHtml,
     formatNgn,
+    moneyInput,
+    balanceHint,
+    txDirection,
     icon,
     toast,
     showFormErrors,

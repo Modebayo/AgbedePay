@@ -59,6 +59,15 @@ export function toApiTransaction(t) {
   };
 }
 
+// Direction of a money movement from one wallet's point of view. The default is
+// that the wallet was debited unless it is the receiver; FUNDING and
+// SAVINGS_WITHDRAWAL credit the wallet even though their ledger row records the
+// wallet in sender_wallet_id.
+function txDirection(type, senderWalletId, walletId) {
+  if (type === "FUNDING" || type === "SAVINGS_WITHDRAWAL") return "CREDIT";
+  return senderWalletId === walletId ? "DEBIT" : "CREDIT";
+}
+
 // Business failure codes emitted by the model -> HTTP response.
 const FAILURE_STATUS = {
   RECIPIENT_NOT_FOUND: [404, "Recipient wallet not found"],
@@ -399,12 +408,7 @@ export async function exportCsvStatement({ userId, status, type, from, to, sort 
   const header = ["Date", "Reference", "Type", "Status", "Direction", "Amount", "Narration", "Sender", "Receiver", "Bank"];
   const lines = rows.map((t) => {
     const amount = Number(t.amount_minor);
-    const direction =
-      t.type === "FUNDING"
-        ? "CREDIT"
-        : t.sender_wallet_id === wallet.id
-          ? "DEBIT"
-          : "CREDIT";
+    const direction = txDirection(t.type, t.sender_wallet_id, wallet.id);
     return [
       t.completed_at ?? t.created_at,
       t.reference,
@@ -452,12 +456,11 @@ export async function getReceipt({ userId, transactionId }) {
   }
 
   const wallet = await walletModel.findByUserId(userId);
-  const direction =
-    transaction.type === "FUNDING"
-      ? "CREDIT"
-      : transaction.sender?.walletId === wallet.id
-        ? "DEBIT"
-        : "CREDIT";
+  const direction = txDirection(
+    transaction.type,
+    transaction.sender?.walletId ?? null,
+    wallet.id
+  );
 
   return {
     receipt: {

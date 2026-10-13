@@ -45,6 +45,27 @@
     return `<span class="badge badge--FAILED">Not verified</span>`;
   }
 
+  // Prominent, always-visible entry point for NIN/BVN verification, so the flow
+  // is discoverable instead of being buried below the bio form. Verification
+  // needs complete bio data first (the backend enforces this), so when bio is
+  // missing we point the user at the bio form with a clear next step.
+  function identityCta(kyc) {
+    if (kyc.identityVerified) return "";
+    if (kyc.bioComplete) {
+      return `
+        <a class="btn btn--primary btn--block" style="margin-top:14px" href="#verify-form">
+          ${ui.icon("id")} Verify your NIN or BVN
+        </a>`;
+    }
+    return `
+      <div class="notice" style="margin-top:14px">
+        <strong>Next step:</strong> complete your bio data below, then verify your NIN or BVN to unlock full limits.
+      </div>
+      <a class="btn btn--ghost btn--block" style="margin-top:10px" href="#bio-form">
+        Complete bio data
+      </a>`;
+  }
+
   function render(kyc) {
     const b = kyc.bio || {};
     const steps = kyc.steps || {};
@@ -102,6 +123,7 @@
               .join("")}
             <li class="steps-list__item ${kyc.identityVerified ? "is-done" : ""}"><span class="steps-list__check">${kyc.identityVerified ? "✓" : "○"}</span>Identity (NIN / BVN)</li>
           </ul>
+          ${identityCta(kyc)}
         </div>
       </div>
 
