@@ -43,9 +43,12 @@
 
         <div class="field" data-field="bank" hidden>
           <label class="field__label" for="bank-name">Bank</label>
-          <select class="input" id="bank-name" name="bankName" required>
-            <option value="">Select a bank…</option>
-          </select>
+          <div class="bank-pick">
+            <span class="bank-badge bank-badge--lg" id="bank-name-badge" aria-hidden="true">BK</span>
+            <select class="input" id="bank-name" name="bankName" required>
+              <option value="">Select a bank…</option>
+            </select>
+          </div>
           <p class="field__error"></p>
         </div>
 

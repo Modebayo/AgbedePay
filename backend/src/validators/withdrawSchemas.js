@@ -6,6 +6,8 @@ export const addAccountSchema = {
   // Nigerian account numbers are 10 digits (NUBAN). Length is re-checked
   // exactly in the service (the digits rule only guarantees "at least n").
   accountNumber: ["required", "digits", 10],
+  // PAYOUT = the user's own bank; AGENT = a cash-agent pickup destination.
+  kind: ["optional", ["enum", ["PAYOUT", "AGENT"]]],
 };
 
 export const accountIdParams = {

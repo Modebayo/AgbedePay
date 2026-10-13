@@ -73,6 +73,7 @@
           await refresh();
         } catch (err) {
           ui.toast(err.message || "Couldn't cancel this request", "error");
+          btn.disabled = false;
         }
       });
     });
@@ -115,6 +116,7 @@
     const submit = ui.$("#request-submit");
 
     phone.addEventListener("input", () => (phone.value = phone.value.replace(/\D/g, "").slice(0, 11)));
+    ui.moneyInput(amount);
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault();

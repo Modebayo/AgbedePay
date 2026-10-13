@@ -116,7 +116,7 @@
       ui.toast("Enter a whole-naira amount of at least ₦1", "error");
       return;
     }
-    if (!/^0?[789][01]\d{8}$/.test(phone) && phone.length < 11) {
+    if (!/^0?[789][01]\d{8}$/.test(phone)) {
       ui.toast("Enter a valid Nigerian phone number", "error");
       return;
     }

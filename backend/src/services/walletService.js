@@ -14,7 +14,7 @@ export async function getWalletForUser(userId) {
   return {
     id: wallet.id,
     currency: wallet.currency,
-    balanceMinor: wallet.balance_minor,
+    balanceMinor: Number(wallet.balance_minor),
     balanceNgn: formatNaira(wallet.balance_minor),
     status: wallet.status,
     updatedAt: wallet.updated_at,

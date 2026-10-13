@@ -147,14 +147,16 @@ export async function depositToGoal({
   if (!ownerGoal || ownerGoal.user_id !== userId) {
     throw new ApiError(404, "Goal not found", "GOAL_NOT_FOUND");
   }
-  if (ownerGoal.status !== "ACTIVE") {
-    throw new ApiError(409, "This goal is no longer accepting deposits", "GOAL_NOT_ACTIVE");
-  }
 
-  // IDEMPOTENT REPLAY: has this (wallet, key) already produced a result?
+  // IDEMPOTENT REPLAY BEFORE the status guard: a deposit that already completed
+  // this goal leaves it ACHIEVED, so re-judging status would 409 a valid retry.
   const existing = await savingsModel.findByGoalAndKey(wallet.id, idempotencyKey);
   if (existing) {
-    return replayDeposit({ userId, goalId: existing.goal_id, wallet, idempotencyKey, ipAddress, userAgent, amountMinor });
+    return replayDeposit({ userId, stored: existing, wallet, idempotencyKey, ipAddress, userAgent, amountMinor });
+  }
+
+  if (ownerGoal.status !== "ACTIVE") {
+    throw new ApiError(409, "This goal is no longer accepting deposits", "GOAL_NOT_ACTIVE");
   }
 
   const result = await savingsModel.executeDeposit({
@@ -170,7 +172,7 @@ export async function depositToGoal({
   if (!result.ok && result.code === "IDEMPOTENCY_CONFLICT") {
     const winner = await savingsModel.findByGoalAndKey(wallet.id, idempotencyKey);
     if (winner) {
-      return replayDeposit({ userId, goalId: winner.goal_id, wallet, idempotencyKey, ipAddress, userAgent, amountMinor });
+      return replayDeposit({ userId, stored: winner, wallet, idempotencyKey, ipAddress, userAgent, amountMinor });
     }
   }
 
@@ -205,7 +207,7 @@ export async function depositToGoal({
     type: "SAVINGS",
     link: linkForType("SAVINGS"),
     title: `${formatNaira(amountMinor)} deposited into ${freshGoal.name}`,
-    body: `Saved so far: ${formatNaira((await savingsModel.amountSavedByGoal(goalId)) / 100)}.`,
+    body: `Saved so far: ${formatNaira(await savingsModel.amountSavedByGoal(goalId))}.`,
   });
 
   return {
@@ -237,14 +239,17 @@ export async function withdrawFromGoal({
   if (!ownerGoal || ownerGoal.user_id !== userId) {
     throw new ApiError(404, "Goal not found", "GOAL_NOT_FOUND");
   }
-  if (ownerGoal.status !== "ACTIVE") {
-    throw new ApiError(409, "This goal is closed", "GOAL_NOT_ACTIVE");
-  }
 
-  // IDEMPOTENT REPLAY: has this (wallet, key) already produced a result?
+  // IDEMPOTENT REPLAY BEFORE the status guard: a withdrawal that dropped this
+  // goal back to ACTIVE (or a closed goal's original success) must still replay
+  // rather than 409 on a retry.
   const existing = await savingsModel.findByGoalAndKey(wallet.id, idempotencyKey, "SAVINGS_WITHDRAWAL");
   if (existing) {
-    return replayWithdrawal({ userId, goalId: existing.goal_id, wallet, idempotencyKey, ipAddress, userAgent, amountMinor });
+    return replayWithdrawal({ userId, stored: existing, wallet, idempotencyKey, ipAddress, userAgent, amountMinor });
+  }
+
+  if (ownerGoal.status !== "ACTIVE" && ownerGoal.status !== "ACHIEVED") {
+    throw new ApiError(409, "This goal is closed", "GOAL_NOT_ACTIVE");
   }
 
   const result = await savingsModel.executeWithdrawal({
@@ -260,7 +265,7 @@ export async function withdrawFromGoal({
   if (!result.ok && result.code === "IDEMPOTENCY_CONFLICT") {
     const winner = await savingsModel.findByGoalAndKey(wallet.id, idempotencyKey, "SAVINGS_WITHDRAWAL");
     if (winner) {
-      return replayWithdrawal({ userId, goalId: winner.goal_id, wallet, idempotencyKey, ipAddress, userAgent, amountMinor });
+      return replayWithdrawal({ userId, stored: winner, wallet, idempotencyKey, ipAddress, userAgent, amountMinor });
     }
   }
 
@@ -295,7 +300,7 @@ export async function withdrawFromGoal({
     type: "SAVINGS",
     link: linkForType("SAVINGS"),
     title: `${formatNaira(amountMinor)} withdrawn from ${freshGoal.name}`,
-    body: `Back in your wallet: ${formatNaira(freshWallet.balance_minor)}. Saved so far: ${formatNaira((await savingsModel.amountSavedByGoal(goalId)) / 100)}.`,
+    body: `Back in your wallet: ${formatNaira(freshWallet.balance_minor)}. Saved so far: ${formatNaira(await savingsModel.amountSavedByGoal(goalId))}.`,
   });
 
   return {
@@ -308,7 +313,8 @@ export async function withdrawFromGoal({
 }
 
 // Share the STORED outcome of an already-processed (wallet, key) withdrawal.
-async function replayWithdrawal({ userId, goalId, wallet, idempotencyKey, ipAddress, userAgent, amountMinor }) {
+async function replayWithdrawal({ userId, stored, wallet, idempotencyKey, ipAddress, userAgent, amountMinor }) {
+  const goalId = stored.goal_id;
   const goal = await savingsModel.findGoalById(goalId);
   const freshWallet = await walletModel.findByUserId(userId);
 
@@ -323,7 +329,7 @@ async function replayWithdrawal({ userId, goalId, wallet, idempotencyKey, ipAddr
   });
 
   return {
-    withdrawal: null,
+    withdrawal: toApiDeposit(stored),
     goal: goal ? toApiGoal(goal) : null,
     balanceMinor: Number(freshWallet.balance_minor),
     balanceNgn: formatNaira(freshWallet.balance_minor),
@@ -333,7 +339,8 @@ async function replayWithdrawal({ userId, goalId, wallet, idempotencyKey, ipAddr
 }
 
 // Share the STORED outcome of an already-processed (wallet, key) deposit.
-async function replayDeposit({ userId, goalId, wallet, idempotencyKey, ipAddress, userAgent, amountMinor }) {
+async function replayDeposit({ userId, stored, wallet, idempotencyKey, ipAddress, userAgent, amountMinor }) {
+  const goalId = stored.goal_id;
   const goal = await savingsModel.findGoalById(goalId);
   const freshWallet = await walletModel.findByUserId(userId);
 
@@ -348,7 +355,7 @@ async function replayDeposit({ userId, goalId, wallet, idempotencyKey, ipAddress
   });
 
   return {
-    deposit: null,
+    deposit: toApiDeposit(stored),
     goal: goal ? toApiGoal(goal) : null,
     balanceMinor: Number(freshWallet.balance_minor),
     balanceNgn: formatNaira(freshWallet.balance_minor),

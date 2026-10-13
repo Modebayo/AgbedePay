@@ -48,19 +48,19 @@
           <span class="goal-card__pct">${progress}%</span>
         </div>
         <div class="goal-card__amounts">
-          <span class="goal-card__current">${g.currentAmountNgn || "₦0.00"}</span>
-          <span class="goal-card__target">of ${g.targetAmountNgn}</span>
+          <span class="goal-card__current">${ui.escapeHtml(g.currentAmountNgn || "₦0.00")}</span>
+          <span class="goal-card__target">of ${ui.escapeHtml(g.targetAmountNgn || "")}</span>
         </div>
         <div class="progress" role="progressbar" aria-valuenow="${progress}" aria-valuemin="0" aria-valuemax="100">
           <div class="progress__fill" style="width:${progress}%"></div>
         </div>
         <div class="goal-card__foot">
-          <span>${remaining}</span>
+          <span>${ui.escapeHtml(remaining)}</span>
           <span class="goal-card__date">${g.targetDate ? "due " + new Date(g.targetDate).toLocaleDateString() : ""}</span>
         </div>
-        ${g.status === "ACTIVE" ? `
+        ${g.status === "ACTIVE" || g.status === "ACHIEVED" ? `
         <div class="goal-card__actions">
-          <button class="goal-card__add" type="button" data-deposit="${g.id}">${ui.icon("plus")} Add money</button>
+          ${g.status === "ACTIVE" ? `<button class="goal-card__add" type="button" data-deposit="${g.id}">${ui.icon("plus")} Add money</button>` : ""}
           ${g.currentAmountMinor > 0 ? `<button class="goal-card__add goal-card__add--ghost" type="button" data-withdraw="${g.id}">${ui.icon("send")} Withdraw</button>` : ""}
         </div>` : ""}
       </div>`;
@@ -79,7 +79,7 @@
       <div class="stats-dash" data-savings-stats>
         <div class="stat-card">
           <div class="stat-card__label">Total saved</div>
-          <div class="stat-card__value" data-saved>${ui.escapeHtml(ui.formatNgn(totalSavedMinor))}</div>
+          <div class="stat-card__value" data-saved>${ui.escapeHtml(ui.formatNgn(totalSavedMinor / 100))}</div>
         </div>
         <div class="stat-card">
           <div class="stat-card__label">Active goals</div>
@@ -105,7 +105,7 @@
           <span class="live-pill"><span class="live-dot"></span>Live</span>
         </div>
         <div class="balance-card__amount" data-total-saved>${ui.escapeHtml(
-          ui.formatNgn(goals.reduce((sum, g) => sum + (g.currentAmountMinor || 0), 0))
+          ui.formatNgn(goals.reduce((sum, g) => sum + (g.currentAmountMinor || 0), 0) / 100)
         )}</div>
         <div class="balance-card__foot" data-total-foot>${goals.length} goal${goals.length === 1 ? "" : "s"} · ${goals.filter((g) => g.status === "ACTIVE").length} active</div>
         <div class="balance-card__actions">
@@ -170,13 +170,21 @@
 
     const form = ui.$("#goal-form");
     if (form) {
+      const target = ui.$("#goal-target");
+      ui.moneyInput(target);
       form.addEventListener("submit", async (e) => {
         e.preventDefault();
         ui.resetFormErrors(form);
-        const naira = Number.parseInt(ui.$("#goal-target").value, 10);
+        const naira = Number.parseInt(target.value, 10);
         if (!Number.isSafeInteger(naira) || naira < 100) {
           ui.toast("Target must be at least ₦100", "error");
           return;
+        }
+        const submit = form.querySelector('button[type="submit"]');
+        const submitHtml = submit ? submit.innerHTML : "";
+        if (submit) {
+          submit.disabled = true;
+          submit.textContent = "Creating…";
         }
         try {
           await api("/savings/goals", {
@@ -193,6 +201,11 @@
           await refresh();
         } catch (err) {
           ui.showFormErrors(form, err);
+        } finally {
+          if (submit) {
+            submit.disabled = false;
+            submit.innerHTML = submitHtml;
+          }
         }
       });
     }
@@ -224,7 +237,7 @@
           <h3>Add money</h3>
           <button class="modal__close" type="button" data-close aria-label="Close">${ui.icon("copy")}</button>
         </div>
-        <p class="modal__sub">${ui.escapeHtml(goal.name)} · <strong>${goal.targetAmountNgn}</strong> target</p>
+        <p class="modal__sub">${ui.escapeHtml(goal.name)} · <strong>${ui.escapeHtml(goal.targetAmountNgn || "")}</strong> target</p>
         <form id="deposit-form" novalidate>
           <div class="error-banner" role="alert"></div>
           <div class="field">
@@ -251,16 +264,24 @@
       pin.value = pin.value.replace(/\D/g, "").slice(0, 6);
     });
 
+    const amountEl = backdrop.querySelector("#dep-amount");
+    ui.moneyInput(amountEl);
+
     backdrop.querySelector("#deposit-form").addEventListener("submit", async (e) => {
       e.preventDefault();
       const form = e.currentTarget;
       ui.resetFormErrors(form);
-      const naira = Number.parseInt(backdrop.querySelector("#dep-amount").value, 10);
+      const naira = Number.parseInt(amountEl.value, 10);
       if (!Number.isSafeInteger(naira) || naira < 1) {
         ui.toast("Enter an amount of at least ₦1", "error");
         return;
       }
+      if (wallet && naira * 100 > wallet.balanceMinor) {
+        ui.toast("You don't have enough wallet balance for this deposit", "error");
+        return;
+      }
       const submit = form.querySelector('button[type="submit"]');
+      const submitHtml = submit.innerHTML;
       submit.disabled = true;
       submit.textContent = "Depositing…";
       try {
@@ -275,7 +296,7 @@
       } catch (err) {
         ui.showFormErrors(form, err);
         submit.disabled = false;
-        submit.textContent = "Deposit";
+        submit.innerHTML = submitHtml;
       }
     });
   }
@@ -300,7 +321,7 @@
           <h3>Withdraw to your wallet</h3>
           <button class="modal__close" type="button" data-close aria-label="Close">${ui.icon("copy")}</button>
         </div>
-        <p class="modal__sub">${ui.escapeHtml(goal.name)} · <strong>${goal.currentAmountNgn}</strong> saved</p>
+        <p class="modal__sub">${ui.escapeHtml(goal.name)} · <strong>${ui.escapeHtml(goal.currentAmountNgn || "")}</strong> saved</p>
         <form id="withdraw-form" novalidate>
           <div class="error-banner" role="alert"></div>
           <div class="field">
@@ -329,11 +350,14 @@
       pin.value = pin.value.replace(/\D/g, "").slice(0, 6);
     });
 
+    const amountEl = backdrop.querySelector("#wd-amount");
+    ui.moneyInput(amountEl);
+
     backdrop.querySelector("#withdraw-form").addEventListener("submit", async (e) => {
       e.preventDefault();
       const form = e.currentTarget;
       ui.resetFormErrors(form);
-      const naira = Number.parseInt(backdrop.querySelector("#wd-amount").value, 10);
+      const naira = Number.parseInt(amountEl.value, 10);
       if (!Number.isSafeInteger(naira) || naira < 1) {
         ui.toast("Enter an amount of at least ₦1", "error");
         return;
@@ -343,6 +367,7 @@
         return;
       }
       const submit = form.querySelector('button[type="submit"]');
+      const submitHtml = submit.innerHTML;
       submit.disabled = true;
       submit.textContent = "Withdrawing…";
       try {
@@ -357,7 +382,7 @@
       } catch (err) {
         ui.showFormErrors(form, err);
         submit.disabled = false;
-        submit.textContent = "Withdraw to wallet";
+        submit.innerHTML = submitHtml;
       }
     });
   }
@@ -375,7 +400,7 @@
     const activeCount = goals.filter((g) => g.status === "ACTIVE").length;
 
     const totalEl = page.querySelector("[data-total-saved]");
-    if (totalEl) totalEl.textContent = ui.formatNgn(total);
+    if (totalEl) totalEl.textContent = ui.formatNgn(total / 100);
     const footEl = page.querySelector("[data-total-foot]");
     if (footEl) footEl.textContent = `${goals.length} goal${goals.length === 1 ? "" : "s"} · ${activeCount} active`;
 
@@ -383,7 +408,7 @@
     if (listEl) listEl.innerHTML = goalsListHtml(goals);
 
     const savedEl = page.querySelector("[data-saved]");
-    if (savedEl) savedEl.textContent = ui.formatNgn(total);
+    if (savedEl) savedEl.textContent = ui.formatNgn(total / 100);
     const activeEl = page.querySelector("[data-active-count]");
     if (activeEl) activeEl.textContent = String(activeCount);
     const balEl = page.querySelector("[data-wallet-balance]");

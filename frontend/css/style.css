@@ -147,13 +147,23 @@ input { font: inherit; }
 .btn--primary:hover { background: var(--blue-dark); }
 .btn--primary:active { transform: translateY(1px); }
 
+/* Ghost buttons sit on light cards by default (ink on white). The hero banner
+   and the balance card put them on dark surfaces and override to white below. */
 .btn--ghost {
+  background: var(--white);
+  color: var(--ink);
+  border-color: var(--line);
+}
+
+.btn--ghost:hover { background: var(--bg); }
+
+/* Dark surfaces: the marketing hero and the balance-card actions. */
+.welcome__actions .btn--ghost {
   background: rgba(255, 255, 255, 0.08);
   color: #fff;
   border-color: rgba(255, 255, 255, 0.2);
 }
-
-.btn--ghost:hover { background: rgba(255, 255, 255, 0.16); }
+.welcome__actions .btn--ghost:hover { background: rgba(255, 255, 255, 0.16); }
 
 .btn--green { background: var(--green); color: #fff; box-shadow: 0 10px 24px -10px rgba(18, 183, 106, 0.6); }
 .btn--green:hover { background: var(--green-dark); }
@@ -1276,6 +1286,214 @@ html[data-theme="dark"] .btn--ghost {
   font-size: 0.78rem;
   color: var(--muted);
 }
+.fund-back { flex: none; margin-top: 6px; }
+
+/* ---------- Add money: methods, banks, USSD & QR ---------- */
+.method-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  padding: 5px;
+  background: var(--card-alt, rgba(91, 107, 132, 0.08));
+  border: 1px solid var(--border, rgba(91, 107, 132, 0.2));
+  border-radius: 14px;
+  margin: 6px 0 16px;
+}
+.method-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 4px;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 650;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+.method-tab .ic { width: 20px; height: 20px; margin: 0; }
+.method-tab.is-active {
+  background: var(--card, #fff);
+  color: var(--blue);
+  box-shadow: 0 1px 4px rgba(18, 25, 45, 0.12);
+}
+[data-theme="dark"] .method-tab.is-active { background: var(--card-dark, #1a2236); }
+
+.method-panel { animation: method-in 0.18s ease; }
+@keyframes method-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .method-panel { animation: none; }
+}
+.method-panel__lead { display: block; margin-bottom: 10px; }
+
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+.card-input { position: relative; display: flex; align-items: center; }
+.card-input .input { padding-left: 68px; }
+.card-brand {
+  position: absolute;
+  left: 10px;
+  min-width: 48px;
+  text-align: center;
+  padding: 4px 6px;
+  border-radius: 6px;
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  background: var(--line);
+  color: var(--muted);
+}
+
+.bank-badges { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.bank-badge {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  box-shadow: 0 4px 10px -6px rgba(0, 0, 0, 0.55);
+}
+.bank-badge--lg { width: 46px; height: 46px; font-size: 0.8rem; flex: none; }
+
+.vaccount {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 16px;
+  background: linear-gradient(135deg, rgba(27, 77, 255, 0.06), rgba(18, 183, 106, 0.06));
+}
+.vaccount__top { display: flex; align-items: center; gap: 12px; }
+.vaccount__meta { display: flex; flex-direction: column; min-width: 0; }
+.vaccount__bank { font-size: 0.82rem; color: var(--muted); }
+.vaccount__name { font-weight: 700; font-size: 0.95rem; letter-spacing: 0.02em; }
+.vaccount__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--line);
+}
+.vaccount__number { font-size: 1.5rem; font-weight: 800; letter-spacing: 0.08em; }
+
+.ussd-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px;
+  background: var(--white);
+}
+.ussd-box code { flex: 1; min-width: 0; font-size: 1.02rem; font-weight: 700; word-break: break-all; }
+.ussd-steps { margin: 14px 0 0; padding-left: 18px; color: var(--muted); font-size: 0.86rem; line-height: 1.6; }
+
+.qr-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 260px;
+  padding: 16px;
+  margin: 0 auto 12px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+.qr-box svg { width: 100%; height: auto; display: block; }
+.qr-caption {
+  text-align: center;
+  font-size: 0.84rem;
+  color: var(--muted);
+  margin-bottom: 12px;
+  word-break: break-all;
+}
+
+.chip--copy .ic { width: 15px; height: 15px; margin: 0; }
+#qr-download { width: 100%; justify-content: center; }
+
+.fund-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+.fund-actions .btn,
+.fund-actions .ghost-btn { width: 100%; }
+
+.success .btn--ghost { background: var(--white); color: var(--ink); border-color: var(--line); }
+.success .btn--ghost:hover { background: var(--bg); }
+html[data-theme="dark"] .success .btn--ghost {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+@media (max-width: 420px) {
+  .method-tab { font-size: 0.72rem; }
+  .method-tab .ic { width: 18px; height: 18px; }
+  .vaccount__number { font-size: 1.25rem; }
+}
+
+/* ---------- Cash out: bank picker & cash agents ---------- */
+.method-tabs--two { grid-template-columns: repeat(2, 1fr); }
+
+.bank-pick { display: flex; align-items: center; gap: 12px; }
+.bank-pick .input { flex: 1; min-width: 0; }
+
+.agent-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.agent-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 8px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--white);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 650;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+.agent-chip:hover { border-color: var(--blue); }
+.agent-chip.is-active {
+  border-color: var(--blue);
+  background: color-mix(in srgb, var(--blue) 8%, var(--white));
+  box-shadow: 0 0 0 1px var(--blue) inset;
+}
+[data-theme="dark"] .agent-chip.is-active { background: var(--card-dark, #1a2236); }
+.agent-chip__name { text-align: center; line-height: 1.2; }
+
+.pickup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin: 14px 0;
+  padding: 14px;
+  border: 1px dashed var(--line);
+  border-radius: 14px;
+  background: var(--bg);
+}
+.pickup__label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.pickup__code { font-size: 1.9rem; font-weight: 800; letter-spacing: 0.18em; font-family: "Consolas", "Courier New", monospace; }
+.pickup__hint { font-size: 0.78rem; color: var(--muted); text-align: center; }
 
 /* ---------- Transactions history ---------- */
 .tx-filters {

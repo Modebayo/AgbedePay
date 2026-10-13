@@ -19,8 +19,28 @@
     </header>
 
     <main class="page">
-      <h1 class="page-title">Add money</h1>
-      <p class="page-sub">Top up your AgbedePay wallet in seconds.</p>
+      <div class="page-head">
+        <div>
+          <h1 class="page-title">Add money</h1>
+          <p class="page-sub">Top up your AgbedePay wallet in seconds.</p>
+        </div>
+        <button class="link-btn fund-back" type="button" id="fund-back" aria-label="Go back">← Back</button>
+      </div>
+
+      <div class="method-tabs" role="tablist" aria-label="Top-up method">
+        <button class="method-tab is-active" type="button" role="tab" aria-selected="true" data-method="card" data-icon="card">
+          <span class="method-tab__ic" aria-hidden="true"></span><span class="method-tab__txt">Card</span>
+        </button>
+        <button class="method-tab" type="button" role="tab" aria-selected="false" data-method="transfer" data-icon="bank">
+          <span class="method-tab__ic" aria-hidden="true"></span><span class="method-tab__txt">Bank transfer</span>
+        </button>
+        <button class="method-tab" type="button" role="tab" aria-selected="false" data-method="ussd" data-icon="phone">
+          <span class="method-tab__ic" aria-hidden="true"></span><span class="method-tab__txt">USSD</span>
+        </button>
+        <button class="method-tab" type="button" role="tab" aria-selected="false" data-method="qr" data-icon="qr">
+          <span class="method-tab__ic" aria-hidden="true"></span><span class="method-tab__txt">QR code</span>
+        </button>
+      </div>
 
       <form class="form card" id="fund-form" novalidate>
         <div class="error-banner" role="alert"></div>
@@ -42,8 +62,83 @@
 
         <p id="preview" class="fund-preview"></p>
 
-        <button class="btn btn--green" id="fund-submit" type="submit">Add money</button>
-        <p class="fund-note">Demo build: top-ups are credited instantly through a simulated gateway — no card is charged and nothing is moved.</p>
+        <!-- Card ---------------------------------------------------------- -->
+        <section class="method-panel" data-panel="card">
+          <div class="field">
+            <label class="field__label" for="card-number">Card number</label>
+            <div class="card-input">
+              <span class="card-brand" id="card-brand" aria-hidden="true">CARD</span>
+              <input class="input" id="card-number" type="text" inputmode="numeric" autocomplete="cc-number" maxlength="23" placeholder="0000 0000 0000 0000" />
+            </div>
+            <p class="field__error"></p>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label class="field__label" for="card-exp">Expiry</label>
+              <input class="input" id="card-exp" type="text" inputmode="numeric" autocomplete="cc-exp" maxlength="5" placeholder="MM/YY" />
+              <p class="field__error"></p>
+            </div>
+            <div class="field">
+              <label class="field__label" for="card-cvv">CVV</label>
+              <input class="input" id="card-cvv" type="password" inputmode="numeric" autocomplete="cc-csc" maxlength="4" placeholder="123" />
+              <p class="field__error"></p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Bank transfer ------------------------------------------------- -->
+        <section class="method-panel" data-panel="transfer" hidden>
+          <p class="field__label method-panel__lead">Transfer to your dedicated AgbedePay account</p>
+          <div class="bank-badges" id="bank-badges" aria-label="Banks you can transfer from"></div>
+          <div class="vaccount">
+            <div class="vaccount__top">
+              <span class="bank-badge bank-badge--lg" id="vaccount-badge" aria-hidden="true">WB</span>
+              <div class="vaccount__meta">
+                <span class="vaccount__bank" id="vaccount-bank">Wema Bank</span>
+                <span class="vaccount__name" id="vaccount-name">—</span>
+              </div>
+            </div>
+            <div class="vaccount__row">
+              <span class="vaccount__number" id="vaccount-number">—</span>
+              <button class="chip chip--copy" type="button" data-copy="vaccount-number">
+                <span class="ic ic--copy" aria-hidden="true"></span> Copy
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- USSD ---------------------------------------------------------- -->
+        <section class="method-panel" data-panel="ussd" hidden>
+          <p class="field__label method-panel__lead">Dial this code from the phone number on your account</p>
+          <div class="ussd-box">
+            <span class="bank-badge" id="ussd-badge" aria-hidden="true">WB</span>
+            <code id="ussd-code">—</code>
+            <button class="chip chip--copy" type="button" data-copy="ussd-code">
+              <span class="ic ic--copy" aria-hidden="true"></span> Copy
+            </button>
+          </div>
+          <ol class="ussd-steps">
+            <li>Dial the code above from your registered phone.</li>
+            <li>Choose AgbedePay and enter the amount.</li>
+            <li>Confirm the transaction — your wallet is credited instantly in this demo.</li>
+          </ol>
+        </section>
+
+        <!-- QR ------------------------------------------------------------ -->
+        <section class="method-panel" data-panel="qr" hidden>
+          <p class="field__label method-panel__lead">Scan to pay with any bank or wallet app</p>
+          <div class="qr-box" id="qr-box" role="img" aria-label="Payment QR code"></div>
+          <p class="qr-caption" id="qr-caption">—</p>
+          <button class="chip" type="button" id="qr-download">
+            <span class="ic ic--download" aria-hidden="true"></span> Download QR
+          </button>
+        </section>
+
+        <div class="fund-actions">
+          <button class="btn btn--green" id="fund-submit" type="submit">Add money</button>
+          <button class="ghost-btn" id="fund-cancel" type="button">Cancel</button>
+        </div>
+        <p class="fund-note" id="fund-note">Demo build: top-ups are credited instantly through a simulated gateway — no card is charged and nothing is moved.</p>
       </form>
     </main>
 
@@ -51,6 +146,7 @@
     <div class="ad-ticker" data-ad-ticker aria-hidden="true"></div>
   </div>
 
+  <script src="../js/vendor/qrcode.js"></script>
   <script src="../js/api.js"></script>
   <script src="../js/ui.js"></script>
   <script src="../js/pages/fund.js"></script>

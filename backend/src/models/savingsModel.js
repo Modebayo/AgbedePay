@@ -69,8 +69,11 @@ export async function findGoalDeposits(goalId, { page, limit }) {
 // The goal is recovered by joining on the shared reference (the transactions
 // ledger row and the savings_transactions row use the same reference).
 export async function findByGoalAndKey(walletId, idempotencyKey, type = "SAVINGS_DEPOSIT") {
+  // Returns the STORED savings transaction (its own id/amount/type/reference/
+  // status/created_at) plus the owning goal, so a replay can echo the original
+  // deposit/withdrawal instead of a null placeholder.
   const { rows } = await query(
-    `SELECT st.goal_id, t.id
+    `SELECT st.goal_id, st.id, st.amount_minor, st.type, st.reference, st.status, st.created_at
        FROM transactions t
        JOIN savings_transactions st ON st.reference = t.reference
       WHERE t.sender_wallet_id = $1 AND t.idempotency_key = $2 AND t.type = $3
@@ -251,7 +254,10 @@ export async function executeWithdrawal({
     if (!goal || goal.user_id !== userId) {
       return recordFailure(client, { userId, goalId, walletId, amountMinor, reference, idempotencyKey, code: "GOAL_NOT_FOUND", savingsType: "WITHDRAWAL", ledgerType: "SAVINGS_WITHDRAWAL" });
     }
-    if (goal.status !== "ACTIVE") {
+    // ACHIEVED (target reached) goals still hold the user's money — only a
+    // CLOSED goal is final. Withdrawing from an ACHIEVED goal that drops back
+    // below target reopens it (see the status CASE below).
+    if (goal.status !== "ACTIVE" && goal.status !== "ACHIEVED") {
       return recordFailure(client, { userId, goalId, walletId, amountMinor, reference, idempotencyKey, code: "GOAL_NOT_ACTIVE", savingsType: "WITHDRAWAL", ledgerType: "SAVINGS_WITHDRAWAL" });
     }
     if (Number(goal.current_amount_minor) < amountMinor) {

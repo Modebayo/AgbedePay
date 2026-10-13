@@ -13,8 +13,16 @@ export const listAccounts = asyncHandler(async (req, res) => {
 });
 
 export const addAccount = asyncHandler(async (req, res) => {
-  const data = await withdrawService.addAccount({ userId: req.user.id, ...req.body });
-  res.status(201).json({ success: true, data, message: "Bank account linked." });
+  const kind = req.body.kind === "AGENT" ? "AGENT" : "PAYOUT";
+  const { bankName, accountName, accountNumber } = req.body;
+  const data = await withdrawService.addAccount({
+    userId: req.user.id,
+    bankName,
+    accountName,
+    accountNumber,
+    kind,
+  });
+  res.status(201).json({ success: true, data, message: kind === "AGENT" ? "Cash agent added." : "Bank account linked." });
 });
 
 export const removeAccount = asyncHandler(async (req, res) => {

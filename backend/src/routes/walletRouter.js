@@ -14,6 +14,9 @@ const router = Router();
 // someone else's wallet — there is no :userId parameter to tamper with.
 router.get("/", requireAuth, walletController.getWallet);
 
+// The user's persisted dedicated funding account (bank-transfer top-ups).
+router.get("/virtual-account", requireAuth, walletController.getVirtualAccountHandler);
+
 // Money in. Simulated gateway, real ledger credit. Idempotency → single credit.
 router.post(
   "/fund",

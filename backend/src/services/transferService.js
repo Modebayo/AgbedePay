@@ -112,6 +112,15 @@ export async function sendMoney({
   const sender = await assertWalletActive(senderUserId); // throws if missing/frozen
   await requireOwnPin(pin, senderUserId);
 
+  // IDEMPOTENT REPLAY: has this (sender wallet, key) already produced a result?
+  // Then return the ORIGINAL outcome — the money was already moved (or failed).
+  // This MUST run before the KYC/limit check: a retry of a transfer that already
+  // succeeded must not be re-judged against the daily limit it just consumed.
+  const existing = await transferModel.findExistingByKey(sender.id, idempotencyKey);
+  if (existing) {
+    return replayOutcome({ senderUserId, senderWalletId: sender.id, transactionId: existing.id, idempotencyKey, ipAddress, userAgent, amountMinor });
+  }
+
   // KYC tier cap: per-transfer and daily send limit. Throws before any debit.
   await assertSendAllowed(senderUserId, sender.id, amountMinor);
 
@@ -121,13 +130,6 @@ export async function sendMoney({
   }
   if (recipientWallet.id === sender.id) {
     throw new ApiError(400, "You cannot send money to your own wallet", "SELF_TRANSFER");
-  }
-
-  // IDEMPOTENT REPLAY: has this (sender wallet, key) already produced a result?
-  // Then return the ORIGINAL outcome — the money was already moved (or failed).
-  const existing = await transferModel.findExistingByKey(sender.id, idempotencyKey);
-  if (existing) {
-    return replayOutcome({ senderUserId, senderWalletId: sender.id, transactionId: existing.id, idempotencyKey, ipAddress, userAgent, amountMinor });
   }
 
   const result = await transferModel.executeTransfer({
@@ -240,12 +242,23 @@ export async function verifyBankAccount(userId, { bankName, accountNumber }) {
   return { bankName, accountNumber, accountName };
 }
 
-async function replayBankSend({ senderUserId, account, transactionId }) {
+async function replayBankSend({ senderUserId, transactionId }) {
   const detail = await transferModel.findDetailedById(transactionId);
   const fresh = await walletModel.findByUserId(senderUserId);
+  // Rebuild the beneficiary straight from the STORED transaction, so a replay
+  // does not depend on the current request's bank/account or any side effects.
+  const account =
+    detail && detail.bank_account_id
+      ? {
+          id: detail.bank_account_id,
+          bankName: detail.bank_name,
+          accountName: detail.account_name,
+          accountNumber: detail.account_number,
+        }
+      : null;
   return {
     transfer: detail ? toApiTransaction(detail) : null,
-    account: { id: account.id, bankName: account.bank_name, accountName: account.account_name, accountNumber: account.account_number },
+    account,
     balanceMinor: Number(fresh.balance_minor),
     balanceNgn: formatNaira(fresh.balance_minor),
     replayed: true,
@@ -274,6 +287,12 @@ export async function sendToBankMoney({
   const sender = await assertWalletActive(senderUserId);
   await requireOwnPin(pin, senderUserId);
 
+  // IDEMPOTENT REPLAY first (see sendMoney): a retry must return the stored
+  // outcome and must NOT be re-judged against the daily limit it already used,
+  // nor re-run the name enquiry / beneficiary side effects.
+  const existing = await transferModel.findExistingByKey(sender.id, idempotencyKey, "BANK");
+  if (existing) return replayBankSend({ senderUserId, transactionId: existing.id });
+
   // KYC tier cap: bank sends count against the same send limit as P2P.
   await assertSendAllowed(senderUserId, sender.id, amountMinor);
 
@@ -293,9 +312,6 @@ export async function sendToBankMoney({
     });
   }
 
-  const existing = await transferModel.findExistingByKey(sender.id, idempotencyKey, "BANK");
-  if (existing) return replayBankSend({ senderUserId, account, transactionId: existing.id });
-
   const result = await transferModel.executeSendToBank({
     walletId: sender.id,
     bankAccountId: account.id,
@@ -307,7 +323,7 @@ export async function sendToBankMoney({
 
   if (!result.ok && result.code === "IDEMPOTENCY_CONFLICT") {
     const winner = await transferModel.findExistingByKey(sender.id, idempotencyKey, "BANK");
-    if (winner) return replayBankSend({ senderUserId, account, transactionId: winner.id });
+    if (winner) return replayBankSend({ senderUserId, transactionId: winner.id });
   }
 
   if (!result.ok) {

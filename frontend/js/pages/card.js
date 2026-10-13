@@ -187,6 +187,7 @@
         } else {
           val.textContent = "•••";
           label.textContent = "Show CVV";
+          row.hidden = true;
           cvvBtn.innerHTML = `${ui.icon("eye")} <span data-cvv-label>Show CVV</span>`;
         }
       });

@@ -260,9 +260,9 @@ export async function findDetailedById(id) {
 export async function sumTodayDebitsByType(walletId) {
   const { rows } = await query(
     `SELECT
-        COALESCE(SUM(amount_minor) FILTER (WHERE type = 'TRANSFER'), 0)::int AS send_minor,
-        COALESCE(SUM(amount_minor) FILTER (WHERE type = 'BANK'), 0)::int      AS bank_minor,
-        COALESCE(SUM(amount_minor) FILTER (WHERE type = 'WITHDRAWAL'), 0)::int AS withdraw_minor
+        COALESCE(SUM(amount_minor) FILTER (WHERE type = 'TRANSFER'), 0)::bigint AS send_minor,
+        COALESCE(SUM(amount_minor) FILTER (WHERE type = 'BANK'), 0)::bigint      AS bank_minor,
+        COALESCE(SUM(amount_minor) FILTER (WHERE type = 'WITHDRAWAL'), 0)::bigint AS withdraw_minor
        FROM transactions
       WHERE sender_wallet_id = $1
         AND status = 'SUCCESS'

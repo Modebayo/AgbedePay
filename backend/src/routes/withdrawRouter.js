@@ -7,11 +7,12 @@ import { sendMoneyLimiter } from "../middleware/rateLimit.js";
 import { validate } from "../validators/validate.js";
 import { addAccountSchema, accountIdParams, withdrawSchema } from "../validators/withdrawSchemas.js";
 import * as withdrawController from "../controllers/withdrawController.js";
+import { supportedBanks, supportedAgentNetworks } from "../services/withdrawService.js";
 
 const router = Router();
 
 router.get("/bases", requireAuth, (_req, res) =>
-  res.json({ success: true, data: { banks: ["Access Bank", "GTBank", "First Bank", "Zenith Bank", "UBA", "Kuda"] } })
+  res.json({ success: true, data: { banks: supportedBanks(), agentNetworks: supportedAgentNetworks() } })
 );
 
 router.get("/accounts", requireAuth, withdrawController.listAccounts);

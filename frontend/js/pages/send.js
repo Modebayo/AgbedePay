@@ -68,6 +68,16 @@
     const accountNumber = ui.$("#account-number");
     const verifiedName = ui.$("#bank-verified-name");
 
+    // Monogram badge follows the chosen bank so the picker reads visually.
+    function updateBankBadge() {
+      const badge = ui.$("#bank-name-badge");
+      if (!badge) return;
+      const style = ui.bankStyle(bankSelect.value);
+      badge.textContent = style.short;
+      badge.style.background = style.color;
+    }
+    updateBankBadge();
+
     // Live name enquiry — once a full account number is typed and a bank
     // picked, resolve the account holder so the user *sees* who they're
     // paying before confirming. The backend re-verifies on submit.
@@ -99,6 +109,7 @@
     }
     bankSelect.addEventListener("change", () => {
       ui.resetFormErrors(document.querySelector("#send-form"));
+      updateBankBadge();
       runLookup();
     });
     accountNumber.addEventListener("input", () => {

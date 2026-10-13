@@ -53,22 +53,33 @@ function purchaseResponse({ tx, balance, extra }) {
   };
 }
 
-// The whole purchase flow minus the provider call, shared by all biller types.
+// The whole purchase flow, shared by all biller types.
+//
+// IMPORTANT ORDERING: the idempotency pre-check runs BEFORE `runProvider()`.
+// A retried request (double-click, network resend) must NOT call the provider
+// again — re-delivering airtime or re-vending a meter token is a real-world
+// side effect that debiting once does not undo. We only reach the provider once
+// the key is known to be unused.
 async function settle({
   userId,
   wallet,
   type,
   amountMinor,
-  narration,
   idempotencyKey,
   ipAddress,
   userAgent,
-  extra,
+  runProvider,
+  makeNarration,
+  makeExtra,
 }) {
   const existing = await purchaseModel.findExistingByKey(wallet.id, idempotencyKey);
   if (existing) {
-    return replay({ userId, wallet, transactionId: existing.id, extra });
+    return replay({ userId, wallet, transactionId: existing.id, extra: makeExtra(null) });
   }
+
+  // Key is clear → it is now safe to invoke the (mock) provider exactly once.
+  const providerResult = await runProvider();
+  const narration = makeNarration(providerResult);
 
   const result = await purchaseModel.executePurchase({
     senderWalletId: wallet.id,
@@ -81,7 +92,7 @@ async function settle({
 
   if (!result.ok && result.code === "IDEMPOTENCY_CONFLICT") {
     const winner = await purchaseModel.findExistingByKey(wallet.id, idempotencyKey);
-    if (winner) return replay({ userId, wallet, transactionId: winner.id, extra });
+    if (winner) return replay({ userId, wallet, transactionId: winner.id, extra: makeExtra(providerResult) });
   }
 
   if (!result.ok) {
@@ -111,7 +122,7 @@ async function settle({
   });
 
   return {
-    purchase: purchaseResponse({ tx: detail, balance: fresh, extra }),
+    purchase: purchaseResponse({ tx: detail, balance: fresh, extra: makeExtra(providerResult) }),
     transaction: toApiTransaction(detail),
     balanceMinor: Number(fresh.balance_minor),
     balanceNgn: formatNaira(fresh.balance_minor),
@@ -151,24 +162,22 @@ export async function purchaseAirtime({
   const wallet = await assertWalletActive(userId);
   await requireOwnPin(pin, userId);
 
-  const providerResult = await airtimeProvider.purchaseAirtime({ network, phone, amountMinor });
-  const narration = `Airtime · ${network} · ${formatNaira(amountMinor)} to ${phone}`;
-
   return settle({
     userId,
     wallet,
     type: "AIRTIME",
     amountMinor,
-    narration,
     idempotencyKey,
     ipAddress,
     userAgent,
-    extra: {
+    runProvider: () => airtimeProvider.purchaseAirtime({ network, phone, amountMinor }),
+    makeNarration: () => `Airtime · ${network} · ${formatNaira(amountMinor)} to ${phone}`,
+    makeExtra: (p) => ({
       network,
       phone,
-      provider: providerResult.reference,
-      devOnly: providerResult.devOnly,
-    },
+      provider: p?.reference ?? null,
+      devOnly: p?.devOnly ?? false,
+    }),
   });
 }
 
@@ -197,27 +206,25 @@ export async function purchaseElectricity({
     throw apiErrorFor("PROVIDER_NOT_FOUND");
   }
 
-  const providerResult = await billProvider.purchaseElectricity({ disCo, meterNo, meterType, amountMinor });
-  const narration = `Electricity · ${disCo} · ${meterType.toLowerCase()} meter ${meterNo}`;
-
   return settle({
     userId,
     wallet,
     type: "BILLS",
     amountMinor,
-    narration,
     idempotencyKey,
     ipAddress,
     userAgent,
-    extra: {
+    runProvider: () => billProvider.purchaseElectricity({ disCo, meterNo, meterType, amountMinor }),
+    makeNarration: () => `Electricity · ${disCo} · ${meterType.toLowerCase()} meter ${meterNo}`,
+    makeExtra: (p) => ({
       biller: "ELECTRICITY",
       disCo,
       meterNo,
       meterType,
-      token: providerResult.token,
-      provider: providerResult.reference,
-      devOnly: providerResult.devOnly,
-    },
+      token: p?.token ?? null,
+      provider: p?.reference ?? null,
+      devOnly: p?.devOnly ?? false,
+    }),
   });
 }
 
@@ -243,26 +250,24 @@ export async function purchaseData({
   const plan = billProvider.findDataPlan(network, planId);
   if (!plan) throw apiErrorFor("PLAN_NOT_FOUND");
 
-  const providerResult = await billProvider.purchaseData({ network, planId, phone });
-  const narration = `Data · ${network} · ${plan.label} to ${phone}`;
-
   return settle({
     userId,
     wallet,
     type: "BILLS",
     amountMinor: plan.amountMinor,
-    narration,
     idempotencyKey,
     ipAddress,
     userAgent,
-    extra: {
+    runProvider: () => billProvider.purchaseData({ network, planId, phone }),
+    makeNarration: () => `Data · ${network} · ${plan.label} to ${phone}`,
+    makeExtra: (p) => ({
       biller: "DATA",
       network,
       plan: plan.label,
       phone,
-      provider: providerResult.reference,
-      devOnly: providerResult.devOnly,
-    },
+      provider: p?.reference ?? null,
+      devOnly: p?.devOnly ?? false,
+    }),
   });
 }
 
@@ -296,26 +301,24 @@ export async function purchaseCableSubscription({
   const plan = billProvider.findCablePackage(provider, planId);
   if (!plan) throw apiErrorFor("PLAN_NOT_FOUND");
 
-  const providerResult = await billProvider.purchaseCable({ provider, decoderNo, planId });
-  const narration = `Cable TV · ${provider} · ${plan.label}`;
-
   return settle({
     userId,
     wallet,
     type: "BILLS",
     amountMinor: plan.amountMinor,
-    narration,
     idempotencyKey,
     ipAddress,
     userAgent,
-    extra: {
+    runProvider: () => billProvider.purchaseCable({ provider, decoderNo, planId }),
+    makeNarration: () => `Cable TV · ${provider} · ${plan.label}`,
+    makeExtra: (p) => ({
       biller: "CABLE",
       provider,
       decoderNo,
       plan: plan.label,
-      providerRef: providerResult.reference,
-      devOnly: providerResult.devOnly,
-    },
+      providerRef: p?.reference ?? null,
+      devOnly: p?.devOnly ?? false,
+    }),
   });
 }
 
@@ -348,24 +351,22 @@ export async function purchaseBetting({
   const provider = bettingProvider.listBettingPlatforms().find((p) => p.platform === platform);
   if (!provider) throw apiErrorFor("PROVIDER_NOT_FOUND");
 
-  const providerResult = await bettingProvider.fundBettingAccount({ platform, customerId, amountMinor });
-  const narration = `Betting · ${provider.label} · fund ${customerId}`;
-
   return settle({
     userId,
     wallet,
     type: "BETTING",
     amountMinor,
-    narration,
     idempotencyKey,
     ipAddress,
     userAgent,
-    extra: {
+    runProvider: () => bettingProvider.fundBettingAccount({ platform, customerId, amountMinor }),
+    makeNarration: () => `Betting · ${provider.label} · fund ${customerId}`,
+    makeExtra: (p) => ({
       platform,
       customerId,
-      provider: providerResult.reference,
-      devOnly: providerResult.devOnly,
-    },
+      provider: p?.reference ?? null,
+      devOnly: p?.devOnly ?? false,
+    }),
   });
 }
 

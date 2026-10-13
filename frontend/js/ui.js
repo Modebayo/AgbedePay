@@ -114,6 +114,7 @@ minus: '<path d="M5 12h14"/>',
      gift: '<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M5 12v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-8"/><path d="M12 8v13"/><path d="M12 8c-4 0-5-1.5-5-3s1.5-2.5 3-1.5C11.4 4.5 12 8 12 8Z"/><path d="M12 8c4 0 5-1.5 5-3s-1.5-2.5-3-1.5C12.6 4.5 12 8 12 8Z"/>',
      rewards: '<path d="M3 9h18l-2 4v7a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-7Z"/><path d="M12 9c0-4 1.2-6 4-6s3 1.6 3 3.5c0 .8-.6 1.5-1.4 1.6C15 8.3 13.3 8.8 12 9Z"/><path d="M12 9c0-4-1.2-6-4-6S5 4.6 5 6.5C5 7.3 5.6 8 6.4 8.1 9 8.3 10.7 8.8 12 9Z"/><path d="M4.8 13h14.4"/>',
      card: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/><path d="M7 15h4"/>',
+     qr: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3z"/><path d="M20 14v3M14 20h3M20 20h1"/>',
      lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
      unlock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 7.5-2A4 4 0 0 1 19 8.5"/>',
      eye: '<path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
@@ -196,6 +197,44 @@ minus: '<path d="M5 12h14"/>',
       sign: credit ? "+" : "-",
       label: credit ? "Money in" : "Money out",
     };
+  }
+
+  // Colored monogram badges stand in for bank logos — no external artwork is
+  // fetched. Well-known Nigerian banks get a fixed brand colour; anything else
+  // falls back to initials plus a hue derived from the name so two banks never
+  // share a badge.
+  const BANK_STYLES = [
+    { re: /opay/i, short: "OP", color: "#1bc760" },
+    { re: /palmpay/i, short: "PP", color: "#7b2ff2" },
+    { re: /moniepoint/i, short: "MP", color: "#0357ee" },
+    { re: /kuda/i, short: "K", color: "#40196d" },
+    { re: /gtbank|guaranty|gt ?holdings|gtco/i, short: "GTB", color: "#e05510" },
+    { re: /access/i, short: "AC", color: "#f47b20" },
+    { re: /first ?bank/i, short: "FB", color: "#0033a0" },
+    { re: /zenith/i, short: "ZEN", color: "#e30613" },
+    { re: /\buba\b|united bank/i, short: "UBA", color: "#d81f26" },
+    { re: /stanbic/i, short: "SIB", color: "#003b7a" },
+    { re: /union bank/i, short: "UB", color: "#00a4e4" },
+    { re: /fidelity/i, short: "FID", color: "#0a8f4d" },
+    { re: /wema/i, short: "WB", color: "#7b1fa2" },
+  ];
+  function bankStyle(name) {
+    const key = String(name || "");
+    if (!key.trim()) return { short: "BK", color: "#5b6b84" };
+    for (const s of BANK_STYLES) if (s.re.test(key)) return { short: s.short, color: s.color };
+    const words = key.replace(/[^a-z0-9 ]/gi, " ").trim().split(/\s+/).filter(Boolean);
+    const short = (
+      words.length > 1 ? words.slice(0, 2).map((w) => w[0]).join("") : (words[0] || "BK").slice(0, 2)
+    ).toUpperCase();
+    let h = 0;
+    for (let i = 0; i < key.length; i += 1) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+    return { short, color: `hsl(${h % 360} 62% 42%)` };
+  }
+  function bankBadge(name, opts = {}) {
+    const { short, color } = bankStyle(name);
+    const cls = opts.className ? `bank-badge ${opts.className}` : "bank-badge";
+    const idAttr = opts.id ? ` id="${escapeHtml(opts.id)}"` : "";
+    return `<span class="${cls}"${idAttr} style="background:${color}" title="${escapeHtml(name)}" aria-hidden="true">${escapeHtml(short)}</span>`;
   }
 
   function toast(message, type = "info") {
@@ -693,6 +732,8 @@ minus: '<path d="M5 12h14"/>',
     moneyInput,
     balanceHint,
     txDirection,
+    bankStyle,
+    bankBadge,
     icon,
     toast,
     showFormErrors,
