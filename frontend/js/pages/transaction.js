@@ -1,6 +1,6 @@
-// transaction page — full detail + receipt for one transaction, and the
-// reversal action (sender or receiver, confirmed with PIN, guarded by the
-// backend's FOR UPDATE lock against double reversal).
+// transaction page — full detail + receipt for one transaction. Corner actions:
+// "Report issue" opens a support ticket about this transaction, "Share PDF"
+// links to the printable receipt.
 
 (function () {
   "use strict";
@@ -12,19 +12,20 @@
   const id = params.get("id");
 
   const page = ui.$("#page");
-  const modalBackdrop = ui.$("#reverse-modal");
-  const reverseConfirmBtn = ui.$("#reverse-confirm");
-  const reverseCancelBtn = ui.$("#reverse-cancel");
-  const reversePin = ui.$("#reverse-pin");
-  const reversePinError = ui.$("#reverse-pin-error");
-  const reverseModalText = ui.$("#reverse-modal-text");
+  const modalBackdrop = ui.$("#issue-modal");
+  const issueMessage = ui.$("#issue-message");
+  const issueError = ui.$("#issue-error");
+  const issueConfirmBtn = ui.$("#issue-confirm");
+  const issueCancelBtn = ui.$("#issue-cancel");
+  const issueModalText = ui.$("#issue-modal-text");
 
   if (!id) {
     page.innerHTML = `<div class="error-banner error-banner--show" role="alert">Missing transaction id.</div>`;
     return;
   }
 
-  let current = null; // the w wallet (to compute direction)
+  let current = null; // the current user's wallet (to compute direction)
+  let tx = null; // the transaction being viewed
 
   ui.requireAuth(async (profile) => {
     ui.renderShell(profile, "transactions");
@@ -32,6 +33,7 @@
 
     try {
       const { transaction } = await api(`/transactions/${encodeURIComponent(id)}`);
+      tx = transaction;
       const receiptData = ["SUCCESS", "REVERSED"].includes(transaction.status)
         ? await api(`/transactions/${encodeURIComponent(id)}/receipt`).catch(() => null)
         : null;
@@ -41,18 +43,27 @@
     }
   });
 
+  // Account name sits on top, the number underneath — everywhere we show a
+  // counterparty.
+  function party(name, number) {
+    return `<div class="details__val details__val--stack">
+      <span class="details__name">${ui.escapeHtml(name || "—")}</span>
+      ${number ? `<span class="details__num">${ui.escapeHtml(number)}</span>` : ""}
+    </div>`;
+  }
+
   function render(t, receiptData) {
     const dir = ui.txDirection(t, current.id);
 
     const parties =
       t.type === "FUNDING"
-        ? `<div class="details__row"><div class="details__key">To</div><div class="details__val">${ui.escapeHtml(t.sender?.name || "—")} · own wallet</div></div>`
+        ? `<div class="details__row"><div class="details__key">To</div>${party(t.sender?.name, t.sender?.phone)}</div>`
         : ["WITHDRAWAL", "BANK"].includes(t.type) && t.bank
-          ? `<div class="details__row"><div class="details__key">From</div><div class="details__val">${ui.escapeHtml(t.sender?.name || "—")} · ${ui.escapeHtml(t.sender?.phone || "—")}</div></div>
-             <div class="details__row"><div class="details__key">To</div><div class="details__val">${ui.escapeHtml(t.bank.bankName)} · ${ui.escapeHtml(t.bank.accountName)} ·•• ${ui.escapeHtml(t.bank.accountNumber.slice(-4))}</div></div>`
-        : `
-      <div class="details__row"><div class="details__key">From</div><div class="details__val">${ui.escapeHtml(t.sender?.name || "—")} · ${ui.escapeHtml(t.sender?.phone || "—")}</div></div>
-      <div class="details__row"><div class="details__key">To</div><div class="details__val">${ui.escapeHtml(t.receiver?.name || "—")} · ${ui.escapeHtml(t.receiver?.phone || "—")}</div></div>`;
+          ? `<div class="details__row"><div class="details__key">From</div>${party(t.sender?.name, t.sender?.phone)}</div>
+             <div class="details__row"><div class="details__key">To</div>${party(t.bank.accountName || t.bank.bankName, `${t.bank.bankName} ·•• ${String(t.bank.accountNumber || "").slice(-4)}`)}</div>`
+          : `
+      <div class="details__row"><div class="details__key">From</div>${party(t.sender?.name, t.sender?.phone)}</div>
+      <div class="details__row"><div class="details__key">To</div>${party(t.receiver?.name, t.receiver?.phone)}</div>`;
 
     let receipt = "";
     if (receiptData) {
@@ -73,11 +84,6 @@
           </div>
         </div>`;
     }
-
-    const canReverse = t.type === "TRANSFER" && t.status === "SUCCESS";
-    const reverse = canReverse
-      ? `<button class="ghost-btn" id="reverse-btn" type="button" style="width:100%;color:var(--danger);border-color:rgba(229,72,77,.4)">${ui.icon("reverse")} Reverse transfer</button>`
-      : "";
 
     page.innerHTML = `
       <a class="page-sub" href="transactions.html" style="text-decoration:none;font-size:.85rem">← Back to transactions</a>
@@ -102,62 +108,74 @@
       </div>
 
       ${receipt}
-      ${
-        receiptData
-          ? `<div style="margin-top:14px"><a class="btn btn--ghost btn--block" href="receipt.html?id=${encodeURIComponent(t.id)}">${ui.icon("doc")} Print / save PDF receipt</a></div>`
-          : ""
-      }
-      ${reverse ? `<div style="margin-top:20px;display:flex;flex-direction:column;gap:10px">${reverse}</div>` : ""}
+
+      <div class="tx-actions">
+        <button class="ghost-btn tx-actions__issue" id="issue-btn" type="button">${ui.icon("alert")} Report issue</button>
+        ${
+          receiptData
+            ? `<a class="ghost-btn tx-actions__receipt" href="receipt.html?id=${encodeURIComponent(t.id)}">${ui.icon("share")} Share PDF</a>`
+            : ""
+        }
+      </div>
     `;
 
-    if (canReverse) {
-      ui.$("#reverse-btn").addEventListener("click", openModal);
-    }
+    ui.$("#issue-btn").addEventListener("click", openIssueModal);
   }
 
-  function openModal() {
-    reverseModalText.textContent = "This will send the money back to the original sender and mark the transfer as REVERSED. Are you sure?";
-    reversePin.value = "";
-    reversePinError.style.display = "none";
+  function issueCategory() {
+    if (!tx) return "PAYMENT";
+    return ["WITHDRAWAL", "BANK"].includes(tx.type) ? "WITHDRAWAL" : "PAYMENT";
+  }
+
+  function openIssueModal() {
+    issueModalText.textContent = `Tell us what went wrong with ${tx ? tx.reference : "this transaction"} and our team will get back to you.`;
+    issueMessage.value = "";
+    issueError.style.display = "none";
+    issueConfirmBtn.disabled = false;
+    issueConfirmBtn.textContent = "Submit";
     modalBackdrop.hidden = false;
+    issueMessage.focus();
   }
 
-  function closeModal() {
+  function closeIssueModal() {
     modalBackdrop.hidden = true;
   }
 
-  reverseCancelBtn.addEventListener("click", closeModal);
+  issueCancelBtn.addEventListener("click", closeIssueModal);
   modalBackdrop.addEventListener("click", (e) => {
-    if (e.target === modalBackdrop) closeModal();
+    if (e.target === modalBackdrop) closeIssueModal();
   });
-  reversePin.addEventListener("input", () => {
-    reversePin.value = reversePin.value.replace(/\D/g, "").slice(0, 6);
-    reversePinError.style.display = "none";
+  issueMessage.addEventListener("input", () => {
+    issueError.style.display = "none";
   });
 
-  reverseConfirmBtn.addEventListener("click", async () => {
-    if (!id || !reversePin.value) {
-      reversePinError.textContent = "Enter your 6-digit PIN to confirm.";
-      reversePinError.style.display = "block";
+  issueConfirmBtn.addEventListener("click", async () => {
+    const message = issueMessage.value.trim();
+    if (!message) {
+      issueError.textContent = "Please describe the issue.";
+      issueError.style.display = "block";
       return;
     }
 
-    reverseConfirmBtn.disabled = true;
-    reverseConfirmBtn.textContent = "Reversing…";
+    issueConfirmBtn.disabled = true;
+    issueConfirmBtn.textContent = "Submitting…";
 
     try {
-      await api(`/transactions/${encodeURIComponent(id)}/reverse`, {
+      await api("/support/tickets", {
         method: "POST",
-        body: { pin: reversePin.value },
+        body: {
+          category: issueCategory(),
+          subject: `Issue with ${tx ? tx.reference : "a transaction"}`.slice(0, 120),
+          message,
+        },
       });
-      ui.toast("Transfer reversed", "success");
-      closeModal();
-      window.location.reload();
+      ui.toast("Issue reported — our team will review it", "success");
+      closeIssueModal();
     } catch (err) {
-      reversePinError.textContent = err.message || "Reversal failed";
-      reversePinError.style.display = "block";
-      reverseConfirmBtn.disabled = false;
-      reverseConfirmBtn.textContent = "Yes, reverse";
+      issueError.textContent = err.message || "Could not submit your report";
+      issueError.style.display = "block";
+      issueConfirmBtn.disabled = false;
+      issueConfirmBtn.textContent = "Submit";
     }
   });
 })();

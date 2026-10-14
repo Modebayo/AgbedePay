@@ -102,6 +102,7 @@ async function requireOwnPin(pin, userId) {
 export async function sendMoney({
   senderUserId,
   recipientPhone,
+  recipientAccount,
   amountMinor,
   narration,
   pin,
@@ -111,6 +112,13 @@ export async function sendMoney({
 }) {
   const sender = await assertWalletActive(senderUserId); // throws if missing/frozen
   await requireOwnPin(pin, senderUserId);
+
+  // Exactly one recipient identifier: a phone number or an AgbedePay account number.
+  const phone = typeof recipientPhone === "string" && recipientPhone.trim() !== "" ? recipientPhone.trim() : null;
+  const account = typeof recipientAccount === "string" && recipientAccount.trim() !== "" ? recipientAccount.trim() : null;
+  if ((phone && account) || (!phone && !account)) {
+    throw new ApiError(400, "Provide either a recipient phone number or an AgbedePay account number", ErrorCodes.VALIDATION);
+  }
 
   // IDEMPOTENT REPLAY: has this (sender wallet, key) already produced a result?
   // Then return the ORIGINAL outcome — the money was already moved (or failed).
@@ -124,13 +132,22 @@ export async function sendMoney({
   // KYC tier cap: per-transfer and daily send limit. Throws before any debit.
   await assertSendAllowed(senderUserId, sender.id, amountMinor);
 
-  const recipientWallet = await walletModel.findByOwnerPhone(recipientPhone);
+  const recipientWallet = account
+    ? await walletModel.findByOwnerAccountNumber(account)
+    : await walletModel.findByOwnerPhone(phone);
   if (!recipientWallet) {
-    throw new ApiError(404, "No wallet found for that phone number", "RECIPIENT_NOT_FOUND");
+    throw new ApiError(
+      404,
+      account ? "No AgbedePay account found for that number" : "No wallet found for that phone number",
+      "RECIPIENT_NOT_FOUND"
+    );
   }
   if (recipientWallet.id === sender.id) {
     throw new ApiError(400, "You cannot send money to your own wallet", "SELF_TRANSFER");
   }
+
+  // A single human-readable identifier for audit/notification text.
+  const recipientRef = account ? `account ${account}` : phone;
 
   const result = await transferModel.executeTransfer({
     senderWalletId: sender.id,
@@ -156,7 +173,7 @@ export async function sendMoney({
       action: "TRANSFER_FAILED",
       entityType: "TRANSACTION",
       entityId: null,
-      metadata: { code: result.code, recipientPhone, amountMinor }, // never secrets
+      metadata: { code: result.code, recipient: recipientRef, amountMinor }, // never secrets
       ipAddress,
       userAgent,
     });
@@ -171,7 +188,7 @@ export async function sendMoney({
     action: "TRANSFER_SUCCESS",
     entityType: "TRANSACTION",
     entityId: detail.id,
-    metadata: { reference: detail.reference, recipientPhone, amountMinor }, // never secrets
+    metadata: { reference: detail.reference, recipient: recipientRef, amountMinor }, // never secrets
     ipAddress,
     userAgent,
   });
@@ -180,7 +197,7 @@ export async function sendMoney({
     userId: senderUserId,
     type: "TRANSACTION",
     link: linkForType("TRANSACTION", { id: detail.id }),
-    title: `Sent ${formatNaira(amountMinor)} to ${detail.receiver_name || recipientPhone}`,
+    title: `Sent ${formatNaira(amountMinor)} to ${detail.receiver_name || recipientRef}`,
     body: `Ref ${detail.reference}. New balance ${formatNaira(Number(fresh.balance_minor))}.`,
   });
   const receiverUserId = await walletModel.findUserIdByWalletId(detail.receiver_wallet_id);
@@ -228,6 +245,52 @@ async function replayOutcome({ senderUserId, senderWalletId, transactionId, idem
 
 export function supportedBanks() {
   return BANKS;
+}
+
+// AgbedePay recipient name enquiry: resolve the account holder from either their
+// 10-digit account number or their phone, so the sender SEES who they're paying
+// before confirming. Returns only the display name — never the recipient's
+// balance or any other detail — with the same "who am I sending to?" intent as
+// the bank NUBAN lookup.
+export async function verifyAgbedeAccount(userId, { accountNumber, phone }) {
+  const hasAccount = typeof accountNumber === "string" && accountNumber.trim() !== "";
+  const hasPhone = typeof phone === "string" && phone.trim() !== "";
+  if (hasAccount === hasPhone) {
+    throw new ApiError(400, "Provide either an account number or a phone number", ErrorCodes.VALIDATION);
+  }
+
+  const recipient = hasAccount
+    ? await userModel.findByAccountNumber(accountNumber.trim())
+    : await userModel.findByPhone(phone.trim());
+
+  if (!recipient) {
+    throw new ApiError(404, "No AgbedePay account found", "RECIPIENT_NOT_FOUND");
+  }
+
+  await auditModel.record({
+    userId,
+    action: "AGBEDE_ACCOUNT_RESOLVED",
+    entityType: "USER",
+    entityId: recipient.id,
+    metadata: hasAccount ? { masked: `•• ${accountNumber.slice(-4)}` } : { via: "PHONE" },
+  });
+
+  // findByPhone intentionally omits account_number (pre-migration resilience),
+  // so resolve it separately when the recipient arrived by phone.
+  let resolvedAccount = recipient.account_number ?? null;
+  if (!resolvedAccount) {
+    try {
+      resolvedAccount = await userModel.getAccountNumberById(recipient.id);
+    } catch (_) {
+      resolvedAccount = null; // column absent before migration 036 — stay usable
+    }
+  }
+
+  return {
+    accountName: recipient.full_name,
+    accountNumber: resolvedAccount,
+    phone: recipient.phone ?? null,
+  };
 }
 
 // NUBAN name enquiry → the "who am I sending to?" preview. Runs server-side at

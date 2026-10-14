@@ -197,16 +197,19 @@
 
     const quickActions = `
       <div class="quick-actions">
-        <a class="quick-action" href="send.html"><span class="quick-action__icon" aria-hidden="true">${ui.icon("send")}</span><span>Send</span></a>
+        <a class="quick-action" href="send.html"><span class="quick-action__icon" aria-hidden="true">${ui.icon("send")}</span><span>Transfer</span></a>
         <a class="quick-action" href="airtime.html"><span class="quick-action__icon" aria-hidden="true">${ui.icon("airtime")}</span><span>Airtime</span></a>
         <a class="quick-action" href="bills.html?tab=data"><span class="quick-action__icon" aria-hidden="true">${ui.icon("data")}</span><span>Data</span></a>
-        <a class="quick-action" href="bills.html"><span class="quick-action__icon" aria-hidden="true">${ui.icon("bills")}</span><span>Bills</span></a>
+        <a class="quick-action" href="bills.html"><span class="quick-action__icon" aria-hidden="true">${ui.icon("bills")}</span><span>Utility Bills</span></a>
         <a class="quick-action" href="betting.html"><span class="quick-action__icon" aria-hidden="true">${ui.icon("betting")}</span><span>Betting</span></a>
         <a class="quick-action" href="savings.html"><span class="quick-action__icon" aria-hidden="true">${ui.icon("savings")}</span><span>Savings</span></a>
         <a class="quick-action" href="withdraw.html"><span class="quick-action__icon" aria-hidden="true">${ui.icon("bank")}</span><span>Cash out</span></a>
         <a class="quick-action" href="logistics.html"><span class="quick-action__icon" aria-hidden="true">${ui.icon("box")}</span><span>Dispatch</span></a>
         <a class="quick-action" href="ride.html"><span class="quick-action__icon" aria-hidden="true">${ui.icon("car")}</span><span>Rides</span></a>
+        ${profile.role === "DRIVER" ? `<a class="quick-action" href="driver.html"><span class="quick-action__icon" aria-hidden="true">${ui.icon("route")}</span><span>Drive</span></a>` : ""}
+        ${profile.role === "ADMIN" ? `<a class="quick-action" href="admin.html"><span class="quick-action__icon" aria-hidden="true">${ui.icon("shield")}</span><span>Admin</span></a>` : ""}
         <a class="quick-action" href="wealth.html"><span class="quick-action__icon" aria-hidden="true">${ui.icon("wealth")}</span><span>Wealth</span></a>
+        <a class="quick-action" href="services.html"><span class="quick-action__icon" aria-hidden="true">${ui.icon("layers")}</span><span>Services</span></a>
       </div>`;
 
     const txHtml = txData.items
@@ -226,11 +229,13 @@
         };
         const icon = ui.icon(typeIcons[t.type] || "wallet");
         const { dir, sign } = ui.txDirection(t, w.id);
+        const party = ui.txCounterparty(t, w.id);
         return `
           <a class="tx-item" href="transaction.html?id=${encodeURIComponent(t.id)}">
             <div class="tx-item__icon" aria-hidden="true">${icon}</div>
             <div class="tx-item__main">
-              <div class="tx-item__title">${ui.escapeHtml(t.narration || t.type)}</div>
+              <div class="tx-item__title">${ui.escapeHtml(party.name)}</div>
+              ${party.number ? `<div class="tx-item__number">${ui.escapeHtml(party.number)}</div>` : ""}
               <div class="tx-item__meta">
                 <span class="badge badge--${t.type}">${t.type}</span>
                 <span class="badge badge--${t.status}">${t.status}</span>
@@ -257,9 +262,17 @@
             <span class="live-pill"><span class="live-dot"></span>Live</span>
           </div>
           <div class="balance-card__amount" data-balance>${ui.escapeHtml(w.balanceNgn)}</div>
+          ${
+            profile.accountNumber
+              ? `<div class="balance-card__account">
+                   <span class="balance-card__account-label">AgbedePay account</span>
+                   <button class="balance-card__account-number" type="button" data-copy-account title="Tap to copy">${ui.escapeHtml(profile.accountNumber)} ${ui.icon("copy")}</button>
+                 </div>`
+              : ""
+          }
           <div class="balance-card__foot" data-balance-updated>Status: ${ui.escapeHtml(w.status)} · Updated ${wallet?.updatedAt ? relativeTime(wallet.updatedAt) : "just now"}</div>
           <div class="balance-card__actions">
-            <a class="btn btn--primary btn--small" href="send.html">${ui.icon("send")} Send money</a>
+            <a class="btn btn--primary btn--small" href="send.html">${ui.icon("send")} Transfer</a>
             <a class="btn btn--green btn--small" href="fund.html">${ui.icon("plus")} Add money</a>
             <button class="btn btn--ghost btn--small" type="button" data-copy-account>${ui.icon("copy")} Copy account</button>
           </div>
@@ -273,7 +286,7 @@
           <div class="recent-card__chips" aria-label="Filter transaction history">
             <a class="chip" href="transactions.html?type=TRANSFER">Transfers</a>
             <a class="chip" href="transactions.html?type=AIRTIME">Airtime</a>
-            <a class="chip" href="transactions.html?type=BILLS">Bills</a>
+            <a class="chip" href="transactions.html?type=BILLS">Utility Bills</a>
             <a class="chip" href="transactions.html?type=BETTING">Betting</a>
             <a class="chip" href="transactions.html?type=FUNDING">Top-ups</a>
           </div>
@@ -297,14 +310,15 @@
     const txCount = page.querySelector("[data-tx-count]");
     if (txCount) txCount.textContent = String(txData.total);
 
-    const copyBtn = page.querySelector("[data-copy-account]");
-    if (copyBtn) {
-      copyBtn.addEventListener("click", () => {
-        navigator.clipboard?.writeText(profile.phone)
-          .then(() => ui.toast("Phone number copied", "success"))
+    const copyValue = profile.accountNumber || profile.phone;
+    const copyLabel = profile.accountNumber ? "Account number copied" : "Phone number copied";
+    page.querySelectorAll("[data-copy-account]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        navigator.clipboard?.writeText(copyValue)
+          .then(() => ui.toast(copyLabel, "success"))
           .catch(() => ui.toast("Could not copy", "error"));
       });
-    }
+    });
 
     const refreshBtn = page.querySelector("[data-refresh-market]");
     if (refreshBtn) refreshBtn.addEventListener("click", () => refreshMarket(true));

@@ -39,7 +39,7 @@
             ${networks
               .map(
                 (n) =>
-                  `<button class="chip" type="button" data-network="${ui.escapeHtml(n.network)}">${ui.escapeHtml(n.label)}</button>`
+                  `<button class="chip chip--network" type="button" data-network="${ui.escapeHtml(n.network)}" aria-label="${ui.escapeHtml(n.label)}" title="${ui.escapeHtml(n.label)}">${ui.networkLogo(n.network)}</button>`
               )
               .join("")}
           </div>

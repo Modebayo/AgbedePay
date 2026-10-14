@@ -7,6 +7,7 @@
 // BEFORE anything is charged, so a declined offer never takes money.
 
 import * as rideModel from "../models/rideModel.js";
+import * as driverModel from "../models/driverModel.js";
 import * as walletModel from "../models/wallets.js";
 import * as userModel from "../models/users.js";
 import * as auditModel from "../models/audit.js";
@@ -16,6 +17,8 @@ import { generateReference } from "../utils/reference.js";
 import { ApiError } from "../utils/errors.js";
 import { formatNaira } from "../utils/money.js";
 import { assertWalletActive } from "./walletService.js";
+import { computeRoute } from "./mapsService.js";
+import * as pricingService from "./pricingService.js";
 import * as provider from "../providers/mockRideProvider.js";
 
 // ---- Shared helpers ---------------------------------------------------------
@@ -60,6 +63,8 @@ function toApiBooking(b) {
     pickupAddress: b.pickup_address,
     pickupContact: b.pickup_contact,
     dropoffAddress: b.dropoff_address,
+    pickup: { lat: Number(b.pickup_lat), lng: Number(b.pickup_lng) },
+    dropoff: { lat: Number(b.dropoff_lat), lng: Number(b.dropoff_lng) },
     distanceKm: Number(b.distance_km),
     etaMin: b.est_duration_min,
     fareBreakdown: breakdown,
@@ -100,19 +105,38 @@ export async function meta() {
   return { tiers: provider.listTiers() };
 }
 
-export async function quoteService({ tier, pickup, dropoff, passengers }) {
-  const distanceKm = provider.distanceKmBetween(pickup, dropoff);
-  const q = provider.quote({ tier, distanceKm, passengers });
+// Compute the route + fare once, server-side, from the addresses alone. Returns
+// the full route object (coords + polyline + source) and the DB-backed rate so
+// createBooking can store what quoteService advertised.
+async function buildQuote({ tier, pickup, dropoff, passengers }) {
+  const route = await computeRoute({ origin: pickup, destination: dropoff });
+  const rate = await pricingService.ratesFor("RIDE", tier);
+  const q = provider.quote({
+    tier,
+    distanceKm: route.distanceKm,
+    passengers,
+    baseMinor: rate?.baseMinor,
+    perKmMinor: rate?.perKmMinor,
+  });
   if (!q.ok) {
     throw new ApiError(400, "Too many passengers for this tier", "TOO_MANY_PASSENGERS");
   }
+  return { route, rate, q };
+}
+
+export async function quoteService({ tier, pickup, dropoff, passengers }) {
+  const { route, q } = await buildQuote({ tier, pickup, dropoff, passengers });
   return {
-    distanceKm,
+    distanceKm: route.distanceKm,
     etaMin: q.etaMin,
     surge: q.surge,
     fareBreakdown: q.breakdown,
     totalMinor: q.totalMinor,
     totalNgn: q.totalNgn,
+    polyline: route.polyline,
+    source: route.source,
+    origin: route.origin,
+    destination: route.destination,
   };
 }
 
@@ -135,12 +159,11 @@ export async function createBooking({
   const wallet = await assertWalletActive(userId);
   await requireOwnPin(pin, userId);
 
-  const { distanceKm, etaMin, fareBreakdown, totalMinor } = await quoteService({
-    tier,
-    pickup,
-    dropoff,
-    passengers,
-  });
+  const { route, q } = await buildQuote({ tier, pickup, dropoff, passengers });
+  const distanceKm = route.distanceKm;
+  const etaMin = q.etaMin;
+  const fareBreakdown = q.breakdown;
+  const totalMinor = q.totalMinor;
   if (totalMinor <= 0) throw new ApiError(400, "Invalid fare", "VALIDATION_ERROR");
 
   // Bargain is decided BEFORE any debit: a declined offer never charges.
@@ -191,11 +214,11 @@ export async function createBooking({
       passengers,
       pickupAddress: pickup,
       pickupContact,
-      pickupLat: provider.coordsFor(pickup).lat,
-      pickupLng: provider.coordsFor(pickup).lng,
+      pickupLat: route.origin.lat,
+      pickupLng: route.origin.lng,
       dropoffAddress: dropoff,
-      dropoffLat: provider.coordsFor(dropoff).lat,
-      dropoffLng: provider.coordsFor(dropoff).lng,
+      dropoffLat: route.destination.lat,
+      dropoffLng: route.destination.lng,
       distanceKm,
       estDurationMin: etaMin,
       fareBreakdown,
@@ -243,6 +266,15 @@ export async function createBooking({
     title: `Ride booked · ${pickup} → ${dropoff}`,
     body: `${formatNaira(payable)} held for your ${TIER_LABELS[tier]} trip.`,
   });
+
+  // Fan the request out to online drivers. Best-effort: a not-yet-migrated
+  // driver table must never break a booking.
+  try {
+    const ids = await driverModel.onlineDriversForRide();
+    await driverModel.createOffers({ kind: "RIDE", bookingId: result.booking.id, driverUserIds: ids });
+  } catch {
+    /* driver tables not migrated yet */
+  }
 
   return {
     booking: toApiBooking({ ...result.booking, reference: result.ledger.reference }),

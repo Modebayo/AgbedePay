@@ -25,19 +25,19 @@
 
     <div class="ad-ticker" data-ad-ticker aria-hidden="true"></div>
 
-    <!-- Reversal confirmation modal -->
-    <div class="modal-backdrop" id="reverse-modal" hidden>
+    <!-- Report-issue modal — files a support ticket about this transaction -->
+    <div class="modal-backdrop" id="issue-modal" hidden>
       <div class="modal">
-        <h2 class="modal__title">Reverse this transfer?</h2>
-        <p class="modal__text" id="reverse-modal-text"></p>
+        <h2 class="modal__title">Report an issue</h2>
+        <p class="modal__text" id="issue-modal-text"></p>
         <div class="field">
-          <label class="field__label" for="reverse-pin">Confirm with your 6-digit PIN</label>
-          <input class="input" id="reverse-pin" type="password" inputmode="numeric" maxlength="6" placeholder="••••••" />
-          <p class="field__error" style="display:none;color:var(--danger);font-size:.82rem" id="reverse-pin-error"></p>
+          <label class="field__label" for="issue-message">What went wrong?</label>
+          <textarea class="input" id="issue-message" rows="4" maxlength="1000" placeholder="Describe the problem with this transaction"></textarea>
+          <p class="field__error" style="display:none;color:var(--danger);font-size:.82rem" id="issue-error"></p>
         </div>
         <div class="modal__actions">
-          <button class="ghost-btn" type="button" id="reverse-cancel">Cancel</button>
-          <button class="btn btn--green" type="button" id="reverse-confirm" style="width:auto">Yes, reverse</button>
+          <button class="ghost-btn" type="button" id="issue-cancel">Cancel</button>
+          <button class="btn btn--green" type="button" id="issue-confirm" style="width:auto">Submit</button>
         </div>
       </div>
     </div>

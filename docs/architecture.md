@@ -125,7 +125,8 @@ Auth:        POST /api/auth/register
 User:        GET  /api/users/me
              PATCH /api/users/me
 Wallet:      GET  /api/wallet
-Transactions: POST /api/transactions/send
+Transactions: POST /api/transactions/send              (by phone or AgbedePay account no.)
+             POST /api/transactions/account/verify/agbede (payee name lookup)
              GET  /api/transactions            (paginated)
              GET  /api/transactions/:id
              GET  /api/transactions/:id/receipt

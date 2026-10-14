@@ -57,6 +57,21 @@ export async function getProfileById(userId) {
   const wallet = await walletModel.findByUserId(userId);
   const profile = buildProfile(user, wallet);
   profile.kyc = await buildKycView(userId);
+  // The user's 10-digit AgbedePay account number (migration 036), guarded so the
+  // profile keeps working before that migration is applied.
+  try {
+    profile.accountNumber = await userModel.getAccountNumberById(userId);
+  } catch {
+    profile.accountNumber = null;
+  }
+  // Expose the account role so the shell can surface role-specific entry points
+  // (e.g. the driver dashboard). Guarded so the endpoint keeps working before
+  // the roles migration is applied.
+  try {
+    profile.role = await userModel.getRoleById(userId);
+  } catch {
+    profile.role = null;
+  }
   return profile;
 }
 

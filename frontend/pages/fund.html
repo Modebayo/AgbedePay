@@ -62,26 +62,17 @@
 
         <p id="preview" class="fund-preview"></p>
 
-        <!-- Card ---------------------------------------------------------- -->
+        <!-- Card (hosted checkout) ---------------------------------------- -->
         <section class="method-panel" data-panel="card">
-          <div class="field">
-            <label class="field__label" for="card-number">Card number</label>
-            <div class="card-input">
-              <span class="card-brand" id="card-brand" aria-hidden="true">CARD</span>
-              <input class="input" id="card-number" type="text" inputmode="numeric" autocomplete="cc-number" maxlength="23" placeholder="0000 0000 0000 0000" />
-            </div>
-            <p class="field__error"></p>
-          </div>
-          <div class="field-row">
-            <div class="field">
-              <label class="field__label" for="card-exp">Expiry</label>
-              <input class="input" id="card-exp" type="text" inputmode="numeric" autocomplete="cc-exp" maxlength="5" placeholder="MM/YY" />
-              <p class="field__error"></p>
-            </div>
-            <div class="field">
-              <label class="field__label" for="card-cvv">CVV</label>
-              <input class="input" id="card-cvv" type="password" inputmode="numeric" autocomplete="cc-csc" maxlength="4" placeholder="123" />
-              <p class="field__error"></p>
+          <div class="gateway-note">
+            <span class="gateway-note__ic" id="card-gateway-ic" aria-hidden="true"></span>
+            <div>
+              <p class="method-panel__lead">Secure card checkout</p>
+              <p class="gateway-note__text">
+                You’ll be taken to our payment partner to pay by card. Your card
+                details are entered only on their secure page and are never seen
+                or stored by AgbedePay.
+              </p>
             </div>
           </div>
         </section>
@@ -138,7 +129,7 @@
           <button class="btn btn--green" id="fund-submit" type="submit">Add money</button>
           <button class="ghost-btn" id="fund-cancel" type="button">Cancel</button>
         </div>
-        <p class="fund-note" id="fund-note">Demo build: top-ups are credited instantly through a simulated gateway — no card is charged and nothing is moved.</p>
+        <p class="fund-note" id="fund-note">Top-ups are credited through our secure payment partner.</p>
       </form>
     </main>
 

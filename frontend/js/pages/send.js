@@ -1,7 +1,8 @@
-// send page — send to another AgbedePay wallet instantly, or to a bank
-// account (NUBAN-style name enquiry first, then an immediate transfer).
-// Amounts are entered in NAIRA but converted to KOBO before reaching the
-// backend (which validates kobo as an integer; money is never computed from
+// transfer page — send to another AgbedePay account (by phone OR by their
+// 10-digit AgbedePay account number) instantly, or to any bank account
+// (searchable bank picker, NUBAN-style name enquiry first, then an immediate
+// transfer). Amounts are entered in NAIRA but converted to KOBO before reaching
+// the backend (which validates kobo as an integer; money is never computed from
 // floats here).
 
 (function () {
@@ -12,6 +13,7 @@
 
   let activeMethod = "wallet";
   let banksLoaded = false;
+  let bankList = [];
   let wallet = null;
 
   ui.requireAuth(async (profile) => {
@@ -50,43 +52,144 @@
         ui.$$("[data-field]", document).forEach((f) => {
           const show = f.dataset.field === activeMethod;
           f.hidden = !show;
-          if (show) {
-            const input = f.querySelector("input, select");
-            if (input) input.setAttribute("required", "");
-          } else {
-            const input = f.querySelector("input, select");
-            if (input) input.removeAttribute("required");
+          const input = f.querySelector("input, select");
+          if (input) {
+            if (show) input.setAttribute("required", "");
+            else input.removeAttribute("required");
           }
         });
         ui.resetFormErrors(document.querySelector("#send-form"));
-        if (activeMethod === "bank") loadBanks();
+        if (activeMethod === "bank") loadBanks().then(() => renderBankMenu(bankSearch.value));
         refreshPreview();
       });
     });
 
-    const bankSelect = ui.$("#bank-name");
+    const bankNameEl = ui.$("#bank-name"); // hidden input holding the chosen bank
+    const bankSearch = ui.$("#bank-search");
+    const bankMenu = ui.$("#bank-menu");
+    const bankClear = ui.$("#bank-clear");
     const accountNumber = ui.$("#account-number");
     const verifiedName = ui.$("#bank-verified-name");
+
+    const [recipientEl, amountEl, narrationEl, pinEl] = ["#recipient", "#amount", "#narration", "#pin"].map((s) => ui.$(s));
+    const previewEl = ui.$("#preview");
 
     // Monogram badge follows the chosen bank so the picker reads visually.
     function updateBankBadge() {
       const badge = ui.$("#bank-name-badge");
       if (!badge) return;
-      const style = ui.bankStyle(bankSelect.value);
+      const style = ui.bankStyle(bankNameEl.value);
       badge.textContent = style.short;
       badge.style.background = style.color;
     }
     updateBankBadge();
 
-    // Live name enquiry — once a full account number is typed and a bank
-    // picked, resolve the account holder so the user *sees* who they're
-    // paying before confirming. The backend re-verifies on submit.
-    const [recipientEl, amountEl, narrationEl, pinEl] = ["#recipient", "#amount", "#narration", "#pin"].map((s) => ui.$(s));
-    const previewEl = ui.$("#preview");
+    // ---- Searchable bank picker -------------------------------------------
+    let currentMatches = [];
+    let activeIndex = -1;
 
-    let lookupTimer = null;
-    async function runLookup() {
-      const bankName = bankSelect.value;
+    function renderBankMenu(query) {
+      const q = (query || "").trim().toLowerCase();
+      currentMatches = [];
+      bankList.forEach((name, idx) => {
+        if (!q || name.toLowerCase().includes(q)) currentMatches.push({ name, idx });
+      });
+      activeIndex = -1;
+      if (!currentMatches.length) {
+        bankMenu.innerHTML = `<div class="combobox__empty">${bankList.length ? "No bank matches that search." : "Loading banks…"}</div>`;
+      } else {
+        bankMenu.innerHTML = currentMatches
+          .map(({ name }, i) => {
+            const style = ui.bankStyle(name);
+            return `<div class="combobox__option" role="option" id="bank-opt-${i}" data-i="${i}">
+              <span class="bank-badge bank-badge--sm" style="background:${style.color}" aria-hidden="true">${ui.escapeHtml(style.short)}</span>
+              <span class="combobox__option-name">${ui.escapeHtml(name)}</span>
+            </div>`;
+          })
+          .join("");
+      }
+      bankMenu.hidden = false;
+      bankSearch.setAttribute("aria-expanded", "true");
+    }
+
+    function setActive(i) {
+      const opts = bankMenu.querySelectorAll(".combobox__option");
+      if (!opts.length) return;
+      activeIndex = (i + opts.length) % opts.length;
+      opts.forEach((o, k) => o.classList.toggle("is-active", k === activeIndex));
+      const active = opts[activeIndex];
+      bankSearch.setAttribute("aria-activedescendant", active.id);
+      active.scrollIntoView({ block: "nearest" });
+    }
+
+    function closeBankMenu() {
+      bankMenu.hidden = true;
+      bankSearch.setAttribute("aria-expanded", "false");
+      bankSearch.removeAttribute("aria-activedescendant");
+    }
+
+    function selectBank(name) {
+      bankNameEl.value = name;
+      bankSearch.value = name;
+      bankClear.hidden = !name;
+      updateBankBadge();
+      closeBankMenu();
+      ui.resetFormErrors(document.querySelector("#send-form"));
+      runBankLookup();
+    }
+
+    bankMenu.addEventListener("click", (e) => {
+      const opt = e.target.closest(".combobox__option[data-i]");
+      if (!opt) return;
+      const match = currentMatches[Number(opt.dataset.i)];
+      if (match) selectBank(match.name);
+    });
+
+    bankSearch.addEventListener("input", () => {
+      if (bankNameEl.value && bankSearch.value !== bankNameEl.value) bankNameEl.value = "";
+      bankClear.hidden = !bankSearch.value;
+      renderBankMenu(bankSearch.value);
+      runBankLookup();
+    });
+    bankSearch.addEventListener("focus", () => {
+      loadBanks().then(() => renderBankMenu(bankSearch.value));
+    });
+    bankSearch.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        if (bankMenu.hidden) renderBankMenu(bankSearch.value);
+        setActive(activeIndex + 1);
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setActive(activeIndex - 1);
+      } else if (e.key === "Enter") {
+        if (activeIndex >= 0 && currentMatches[activeIndex]) {
+          e.preventDefault();
+          selectBank(currentMatches[activeIndex].name);
+        }
+      } else if (e.key === "Escape") {
+        closeBankMenu();
+      }
+    });
+    bankClear.addEventListener("click", () => {
+      bankNameEl.value = "";
+      bankSearch.value = "";
+      bankClear.hidden = true;
+      updateBankBadge();
+      ui.$("#bank-verified").hidden = true;
+      bankSearch.focus();
+    });
+    document.addEventListener("click", (e) => {
+      const box = ui.$("#bank-combobox");
+      if (box && !box.contains(e.target)) closeBankMenu();
+    });
+
+    // Live name enquiry for the bank account — once a full account number is
+    // typed and a bank picked, resolve the holder so the user *sees* who they're
+    // paying before confirming. The backend re-verifies on submit.
+    let bankLookupTimer = null;
+    async function runBankLookup() {
+      const bankName = bankNameEl.value;
       const number = accountNumber.value.replace(/\D/g, "");
       const verifiedBox = ui.$("#bank-verified");
       if (!bankName || number.length !== 10) {
@@ -107,15 +210,40 @@
         accountNumber.closest(".field").classList.add("field--invalid");
       }
     }
-    bankSelect.addEventListener("change", () => {
-      ui.resetFormErrors(document.querySelector("#send-form"));
-      updateBankBadge();
-      runLookup();
-    });
     accountNumber.addEventListener("input", () => {
       accountNumber.value = accountNumber.value.replace(/\D/g, "").slice(0, 10);
-      clearTimeout(lookupTimer);
-      lookupTimer = setTimeout(runLookup, 450);
+      clearTimeout(bankLookupTimer);
+      bankLookupTimer = setTimeout(runBankLookup, 450);
+    });
+
+    // Live name enquiry for the AgbedePay wallet — the recipient may be given by
+    // phone (11 digits) or by their 10-digit AgbedePay account number.
+    const walletVerifiedBox = ui.$("#wallet-verified");
+    const walletVerifiedName = ui.$("#wallet-verified-name");
+    let walletLookupTimer = null;
+    async function runWalletLookup() {
+      const raw = recipientEl.value.replace(/\D/g, "");
+      const field = recipientEl.closest(".field");
+      if (raw.length !== 10 && raw.length !== 11) {
+        walletVerifiedBox.hidden = true;
+        field.classList.remove("field--invalid");
+        return;
+      }
+      const body = raw.length === 10 ? { accountNumber: raw } : { phone: raw };
+      try {
+        const res = await api("/transactions/account/verify/agbede", { method: "POST", body });
+        walletVerifiedName.textContent = res.accountName;
+        walletVerifiedBox.hidden = false;
+        field.classList.remove("field--invalid");
+      } catch (_) {
+        walletVerifiedBox.hidden = true;
+        field.classList.add("field--invalid");
+      }
+    }
+    recipientEl.addEventListener("input", () => {
+      recipientEl.value = recipientEl.value.replace(/\D/g, "").slice(0, 11);
+      clearTimeout(walletLookupTimer);
+      walletLookupTimer = setTimeout(runWalletLookup, 450);
     });
 
     async function loadBanks() {
@@ -123,16 +251,10 @@
       try {
         const res = await api("/transactions/banks");
         // The API returns plain bank-name strings; tolerate {name} objects too.
-        (res.banks || [])
+        bankList = (res.banks || [])
           .map((b) => (typeof b === "string" ? b : b && b.name))
           .filter(Boolean)
-          .sort((a, b) => a.localeCompare(b, "en", { sensitivity: "base" }))
-          .forEach((name) => {
-            const opt = document.createElement("option");
-            opt.value = name;
-            opt.textContent = name;
-            bankSelect.appendChild(opt);
-          });
+          .sort((a, b) => a.localeCompare(b, "en", { sensitivity: "base" }));
         banksLoaded = true;
       } catch (_) {
         /* banks list stays empty; backend still validates on submit */
@@ -143,7 +265,7 @@
       if (!previewEl) return;
       const v = Number.parseInt(amountEl.value, 10);
       if (v > 0) {
-        const costMinor = activeMethod === "bank" ? v * 100 : v * 100;
+        const costMinor = v * 100;
         if (costMinor > wallet.balanceMinor) {
           previewEl.textContent = `You don't have enough balance for this amount.`;
           previewEl.style.color = "var(--danger)";
@@ -181,15 +303,18 @@
       let payload = {};
       let endpoint = "/transactions/send";
       if (activeMethod === "wallet") {
-        const recipientPhone = recipientEl.value.trim();
-        if (!/^0[789][01]?\d{8}$/.test(recipientPhone.replace(/\s/g, "")) && !/^\d{11}$/.test(recipientPhone)) {
-          ui.toast("Enter a valid 11-digit phone number", "error");
+        const raw = recipientEl.value.replace(/\D/g, "");
+        if (raw.length === 11) {
+          payload = { recipientPhone: raw, amountMinor, narration, pin: pinEl.value };
+        } else if (raw.length === 10) {
+          payload = { recipientAccount: raw, amountMinor, narration, pin: pinEl.value };
+        } else {
+          ui.toast("Enter a valid 11-digit phone number or 10-digit AgbedePay account number", "error");
           return;
         }
-        payload = { recipientPhone, amountMinor, narration, pin: pinEl.value };
       } else {
         payload = {
-          bankName: bankSelect.value,
+          bankName: bankNameEl.value,
           accountNumber: accountNumber.value.replace(/\D/g, ""),
           amountMinor,
           narration,

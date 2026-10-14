@@ -12,7 +12,6 @@
 
   const STEP_LABELS = ["Searching", "Driver accepted", "Driver arriving", "In progress", "Completed"];
   const STATUS_STEP = { SEARCHING: 0, DRIVER_ACCEPTED: 1, DRIVER_ARRIVING: 2, IN_PROGRESS: 3, COMPLETED: 4 };
-  const NEXT_ACTION = { SEARCHING: "ACCEPT", DRIVER_ACCEPTED: "ARRIVE", DRIVER_ARRIVING: "START", IN_PROGRESS: "COMPLETE" };
 
   const TIER_CAPS = { ECONOMY: 4, COMFORT: 4, BARGAIN: 1 };
 
@@ -46,7 +45,6 @@
     tipMinor: 0,
     quote: null,
     booking: null,
-    auto: true,
     timer: null,
     focus: "pickup",
   };
@@ -82,8 +80,7 @@
       ui.$("#ride-book-card").hidden = true;
       const track = ui.$("#ride-track");
       track.hidden = false;
-      state.auto = false;
-      stopAuto();
+      stopPolling();
       renderTracking();
       if (data.booking.status === "COMPLETED" && !data.booking.rating) renderSuccess();
       track.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -245,6 +242,19 @@
     card.querySelectorAll("[data-place]").forEach((b) => b.addEventListener("click", onPickPlace));
 
     card.querySelector("#ride-estimate").addEventListener("click", onEstimate);
+
+    // Places autocomplete (no-op when maps aren't configured). Selecting a
+    // suggestion updates the address text so the server-side quote is accurate.
+    if (window.AgbeMaps) {
+      window.AgbeMaps.autocomplete(card.querySelector('[data-field="pickup"]'), (value) => {
+        state.pickup = value;
+        clearQuote();
+      });
+      window.AgbeMaps.autocomplete(card.querySelector('[data-field="dropoff"]'), (value) => {
+        state.dropoff = value;
+        clearQuote();
+      });
+    }
   }
 
   function bargainField() {
@@ -370,6 +380,7 @@ async function onSavePlace() {
     q.innerHTML = `
       <div class="card">
         <div class="section-head" style="margin:0 0 4px"><h2>Fare estimate — ${ui.escapeHtml(state.quote.surge > 1 ? "higher demand pricing" : "standard pricing")}</h2></div>
+        <div class="route-map route-map--live" id="ride-map" hidden></div>
         <div class="route-panel">
           <div class="route-panel__row">${ui.icon("pin")}<span>${ui.escapeHtml(state.pickup.trim())}</span></div>
           <div class="route-panel__row">${ui.icon("route")}<span>${ui.escapeHtml(state.quote.distanceKm)} km · ~${ui.escapeHtml(state.quote.etaMin)} min</span></div>
@@ -389,6 +400,21 @@ async function onSavePlace() {
       </div>
     `;
     q.querySelector("#ride-book").addEventListener("click", onBook);
+    drawQuoteMap();
+  }
+
+  // Draw the live route if Google Maps is configured; otherwise the CSS route
+  // panel above carries the information and this silently does nothing.
+  async function drawQuoteMap() {
+    const el = ui.$("#ride-map");
+    if (!el || !window.AgbeMaps || !state.quote) return;
+    const ok = await window.AgbeMaps.enabled().catch(() => false);
+    if (!ok) return;
+    el.hidden = false;
+    await window.AgbeMaps.initMap(el, {
+      origin: state.quote.origin,
+      destination: state.quote.destination,
+    });
   }
 
   async function onBook() {
@@ -454,13 +480,13 @@ async function onSavePlace() {
   }
 
   function startTracking() {
-    stopAuto();
+    stopPolling();
     ui.$("#ride-book-card").hidden = true;
     const track = ui.$("#ride-track");
     track.hidden = false;
     track.innerHTML = `<div class="card">${ui.loadingCard("Finding your driver…")}</div>`;
     renderTracking();
-    if (state.auto) startAuto();
+    startPolling();
   }
 
   function renderTracking() {
@@ -492,6 +518,7 @@ async function onSavePlace() {
     `;
     bindTracking();
     renderHistory();
+    drawTrackingMap();
   }
 
   function renderSearching() {
@@ -506,7 +533,8 @@ async function onSavePlace() {
   function renderMap(step) {
     const pct = Math.min(100, Math.max(0, Math.round((step / Math.max(1, STEP_LABELS.length - 1)) * 100)));
     return `
-      <div class="route-map" aria-hidden="true">
+      <div class="route-map route-map--live" id="ride-track-map" hidden></div>
+      <div class="route-map" id="ride-rail" aria-hidden="true">
         <div class="route-map__rail">
           <span class="route-map__pin route-map__pin--a">${ui.icon("pin")}</span>
           <span class="route-map__line">
@@ -516,6 +544,19 @@ async function onSavePlace() {
           <span class="route-map__carpin" style="top:${pct}%">${ui.icon("car")}</span>
         </div>
       </div>`;
+  }
+
+  // Draw the trip on a live map when configured; hide the CSS rail then.
+  async function drawTrackingMap() {
+    const el = ui.$("#ride-track-map");
+    const rail = ui.$("#ride-rail");
+    const b = state.booking;
+    if (!el || !b || !window.AgbeMaps) return;
+    const ok = await window.AgbeMaps.enabled().catch(() => false);
+    if (!ok) return;
+    el.hidden = false;
+    if (rail) rail.hidden = true;
+    await window.AgbeMaps.initMap(el, { origin: b.pickup, destination: b.dropoff });
   }
 
   function renderDriver() {
@@ -550,27 +591,12 @@ async function onSavePlace() {
     if (done) return "";
     return `
       <div class="control-bar">
-        <button type="button" class="chip" data-pause>${state.auto ? "Pause" : "Resume"}</button>
-        <span class="control-bar__state">${state.auto ? "Auto-advancing every 6s" : "Paused"}</span>
-        <button type="button" class="btn btn--small" data-step>Next step</button>
+        <span class="control-bar__state">Live tracking — your driver updates this status as the trip progresses.</span>
       </div>
       <button class="ghost-btn ghost-btn--danger" type="button" data-cancel>${ui.icon("ban")} Cancel ride</button>`;
   }
 
   function bindTracking() {
-    const pause = page.querySelector("[data-pause]");
-    if (pause) {
-      pause.addEventListener("click", () => {
-        state.auto = !state.auto;
-        if (state.auto) startAuto();
-        else stopAuto();
-        renderTracking();
-      });
-    }
-
-    const stepBtn = page.querySelector("[data-step]");
-    if (stepBtn) stepBtn.addEventListener("click", manualAdvance);
-
     const cancelBtn = page.querySelector("[data-cancel]");
     if (cancelBtn) cancelBtn.addEventListener("click", onCancel);
 
@@ -602,43 +628,33 @@ async function onSavePlace() {
     }
   }
 
-  function manualAdvance() {
-    const b = state.booking;
-    const action = NEXT_ACTION[b.status];
-    if (!action) return;
-    runAdvance(action);
+  // ---- Live status polling ------------------------------------------------
+  // The trip is DRIVER-driven: the customer only reads status. We poll the
+  // booking and re-render on change, stopping at a terminal state.
+  function startPolling() {
+    stopPolling();
+    state.timer = window.setInterval(refreshBooking, 5000);
   }
 
-  function runAdvance(action) {
-    return api(`/ride/bookings/${state.booking.id}/advance`, {
-      method: "POST",
-      body: { action },
-    })
-      .then((data) => {
-        state.booking = data.booking;
-        renderTracking();
-        if (data.booking.status === "COMPLETED") renderSuccess();
-      })
-      .catch((err) => ui.toast(err.message, "error"));
-  }
-
-  function startAuto() {
-    stopAuto();
-    state.timer = window.setInterval(() => {
-      const b = state.booking;
-      if (!b) return;
-      if (b.status === "COMPLETED" || b.status === "CANCELLED") {
-        stopAuto();
-        return;
-      }
-      const action = NEXT_ACTION[b.status];
-      if (action) runAdvance(action);
-    }, 6000);
-  }
-
-  function stopAuto() {
+  function stopPolling() {
     if (state.timer) window.clearInterval(state.timer);
     state.timer = null;
+  }
+
+  async function refreshBooking() {
+    if (!state.booking) return;
+    try {
+      const data = await api(`/ride/bookings/${state.booking.id}`);
+      const prev = state.booking.status;
+      state.booking = data.booking;
+      if (data.booking.status !== prev) {
+        renderTracking();
+        if (data.booking.status === "COMPLETED") renderSuccess();
+      }
+      if (data.booking.status === "COMPLETED" || data.booking.status === "CANCELLED") stopPolling();
+    } catch {
+      /* transient — try again next tick */
+    }
   }
 
   async function onCancel() {
@@ -652,7 +668,7 @@ async function onSavePlace() {
       const data = await api(`/ride/bookings/${state.booking.id}/cancel`, { method: "POST" });
       state.booking = data.booking;
       ui.toast(`Refunded ${data.refundedNgn}`, "success");
-      stopAuto();
+      stopPolling();
       renderTracking();
     } catch (err) {
       ui.toast(err.message, "error");

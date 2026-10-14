@@ -11,7 +11,6 @@
 
   const STEP_LABELS = ["Order placed", "Rider assigned", "Picked up", "In transit", "Delivered"];
   const STATUS_STEP = { BOOKED: 0, RIDER_ASSIGNED: 1, PICKED_UP: 2, IN_TRANSIT: 3, DELIVERED: 4 };
-  const NEXT_ACTION = { BOOKED: "ASSIGN", RIDER_ASSIGNED: "PICKUP", PICKED_UP: "TRANSIT", IN_TRANSIT: "DELIVER" };
 
   const VEHICLE_HANDLES = {
     DOCUMENT: ["BIKE", "CAR", "VAN"],
@@ -44,7 +43,6 @@
     dropoffContact: "",
     quote: null,
     booking: null,
-    auto: true,
     timer: null,
     focus: "pickup",
   };
@@ -176,6 +174,18 @@
     card.querySelector("#logi-estimate").addEventListener("click", onEstimate);
     card.querySelectorAll("[data-save-place]").forEach((b) => b.addEventListener("click", onSavePlace));
     card.querySelectorAll("[data-place]").forEach((b) => b.addEventListener("click", onPickPlace));
+
+    // Places autocomplete (no-op when maps aren't configured).
+    if (window.AgbeMaps) {
+      window.AgbeMaps.autocomplete(card.querySelector("#logi-pickup"), (value) => {
+        state.pickup = value;
+        clearQuote();
+      });
+      window.AgbeMaps.autocomplete(card.querySelector("#logi-dropoff"), (value) => {
+        state.dropoff = value;
+        clearQuote();
+      });
+    }
   }
 
   function vehicleChips() {
@@ -282,25 +292,41 @@
   }
 
   function renderQuote() {
-    const q = ui.$("#logi-quote");
-    q.innerHTML = `
+    const el = ui.$("#logi-quote");
+    const quote = state.quote;
+    el.innerHTML = `
       <div class="card">
         <div class="section-head" style="margin:0 0 4px"><h2>Fare estimate</h2></div>
+        <div class="route-map route-map--live" id="logi-map" hidden></div>
         <div class="route-panel">
           <div class="route-panel__row">${ui.icon("pin")}<span>${ui.escapeHtml(state.pickup.trim())}</span></div>
-          <div class="route-panel__row">${ui.icon("route")}<span>${ui.escapeHtml(q.distanceKm)} km · ~${ui.escapeHtml(q.etaMin)} min</span></div>
+          <div class="route-panel__row">${ui.icon("route")}<span>${ui.escapeHtml(quote.distanceKm)} km · ~${ui.escapeHtml(quote.etaMin)} min</span></div>
           <div class="route-panel__row">${ui.icon("box")}<span>Deliver to ${ui.escapeHtml(state.dropoff.trim())}</span></div>
         </div>
-        <div class="details">${fareLines(q)}</div>
+        <div class="details">${fareLines(quote)}</div>
         <div class="quote-total">
           <span>To hold in escrow</span>
-          <strong>${ui.escapeHtml(q.totalNgn)}</strong>
+          <strong>${ui.escapeHtml(quote.totalNgn)}</strong>
         </div>
-        <button class="btn btn--green" id="logi-book" type="button">Book &amp; pay ${ui.escapeHtml(q.totalNgn)}</button>
+        <button class="btn btn--green" id="logi-book" type="button">Book &amp; pay ${ui.escapeHtml(quote.totalNgn)}</button>
         <p class="fund-note">The amount is held in escrow and only released to the rider on delivery. Cancelling anytime refunds it in full.</p>
       </div>
     `;
-    q.querySelector("#logi-book").addEventListener("click", onBook);
+    el.querySelector("#logi-book").addEventListener("click", onBook);
+    drawQuoteMap();
+  }
+
+  // Draw the live route when Google Maps is configured; silently no-op otherwise.
+  async function drawQuoteMap() {
+    const el = ui.$("#logi-map");
+    if (!el || !window.AgbeMaps || !state.quote) return;
+    const ok = await window.AgbeMaps.enabled().catch(() => false);
+    if (!ok) return;
+    el.hidden = false;
+    await window.AgbeMaps.initMap(el, {
+      origin: state.quote.origin,
+      destination: state.quote.destination,
+    });
   }
 
   async function onBook() {
@@ -355,8 +381,7 @@
       ui.$("#logi-book-card").hidden = true;
       const track = ui.$("#logi-track");
       track.hidden = false;
-      state.auto = false;
-      stopAuto();
+      stopPolling();
       renderTracking();
       if (state.booking.status === "DELIVERED" && !state.booking.rating) renderSuccess();
       track.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -382,13 +407,13 @@
   }
 
   function startTracking() {
-    stopAuto();
+    stopPolling();
     ui.$("#logi-book-card").hidden = true;
     const track = ui.$("#logi-track");
     track.hidden = false;
     track.innerHTML = "<div class=\"card\">" + ui.loadingCard("Loading your booking…") + "</div>";
     renderTracking();
-    if (state.auto) startAuto();
+    startPolling();
   }
 
   function renderTracking() {
@@ -419,12 +444,14 @@
     `;
     bindTracking();
     renderHistory();
+    drawTrackingMap();
   }
 
   function renderMap(step) {
     const pct = Math.min(100, Math.max(0, Math.round((step / Math.max(1, STEP_LABELS.length - 1)) * 100)));
     return `
-      <div class="route-map" aria-hidden="true">
+      <div class="route-map route-map--live" id="logi-track-map" hidden></div>
+      <div class="route-map" id="logi-rail" aria-hidden="true">
         <div class="route-map__rail">
           <span class="route-map__pin route-map__pin--a">${ui.icon("pin")}</span>
           <span class="route-map__line">
@@ -434,6 +461,19 @@
           <span class="route-map__carpin" style="top:${pct}%">${ui.icon(step >= 4 ? "box" : "bike")}</span>
         </div>
       </div>`;
+  }
+
+  // Draw the delivery on a live map when Google Maps is configured.
+  async function drawTrackingMap() {
+    const el = ui.$("#logi-track-map");
+    const rail = ui.$("#logi-rail");
+    const b = state.booking;
+    if (!el || !b || !window.AgbeMaps) return;
+    const ok = await window.AgbeMaps.enabled().catch(() => false);
+    if (!ok) return;
+    el.hidden = false;
+    if (rail) rail.hidden = true;
+    await window.AgbeMaps.initMap(el, { origin: b.pickup, destination: b.dropoff });
   }
 
   function renderRider() {
@@ -463,7 +503,7 @@
         <p class="otp-gate__text">Ask the recipient for the 4-digit delivery code, then enter it below to release the fare.</p>
         <div class="token-box" style="margin:6px 0 12px">
           <div class="token-box__label">DEV/MOCK recipient code</div>
-          <div class="token-box__value">${ui.escapeHtml(state.booking.devMock.deliveryCode)}</div>
+          <div class="token-box__value">${ui.escapeHtml(state.booking.devMock?.deliveryCode ?? "----")}</div>
         </div>
         <div class="field">
           <input class="input input--otp" type="text" inputmode="numeric" maxlength="4" placeholder="4-digit code from the recipient" aria-label="Delivery code" />
@@ -482,27 +522,12 @@
     }
     return `
       <div class="control-bar">
-        <button type="button" class="chip" data-pause>${state.auto ? "Pause" : "Resume"}</button>
-        <span class="control-bar__state">${state.auto ? "Auto-advancing every 6s" : "Paused"}</span>
-        <button type="button" class="btn btn--small" data-step>Next step</button>
+        <span class="control-bar__state">Live tracking — your rider updates this status as the delivery progresses.</span>
       </div>
       <button class="ghost-btn ghost-btn--danger" type="button" data-cancel>${ui.icon("ban")} Cancel &amp; refund</button>`;
   }
 
   function bindTracking() {
-    const pause = page.querySelector("[data-pause]");
-    if (pause) {
-      pause.addEventListener("click", () => {
-        state.auto = !state.auto;
-        if (state.auto) startAuto();
-        else stopAuto();
-        renderTracking();
-      });
-    }
-
-    const stepBtn = page.querySelector("[data-step]");
-    if (stepBtn) stepBtn.addEventListener("click", manualAdvance);
-
     const cancelBtn = page.querySelector("[data-cancel]");
     if (cancelBtn) cancelBtn.addEventListener("click", onCancel);
 
@@ -545,46 +570,32 @@
     }
   }
 
-  function manualAdvance() {
-    const b = state.booking;
-    const action = NEXT_ACTION[b.status];
-    if (!action) return;
-    if (action === "DELIVER") {
-      ui.toast("Enter the delivery code from the recipient to finish", "error");
-      return;
-    }
-    runAdvance(action);
+  // ---- Live status polling ------------------------------------------------
+  // Driver-driven: the customer reads status. We poll and re-render on change.
+  function startPolling() {
+    stopPolling();
+    state.timer = window.setInterval(refreshBooking, 5000);
   }
 
-  function runAdvance(action) {
-    return api(`/dispatch/bookings/${state.booking.id}/advance`, {
-      method: "POST",
-      body: { action },
-    })
-      .then((data) => {
-        state.booking = data.booking;
-        renderTracking();
-      })
-      .catch((err) => ui.toast(err.message, "error"));
-  }
-
-  function startAuto() {
-    stopAuto();
-    state.timer = window.setInterval(() => {
-      const b = state.booking;
-      if (!b) return;
-      if (b.status === "IN_TRANSIT" || b.status === "DELIVERED" || b.status === "CANCELLED") {
-        stopAuto();
-        return;
-      }
-      const action = NEXT_ACTION[b.status];
-      if (action) runAdvance(action);
-    }, 6000);
-  }
-
-  function stopAuto() {
+  function stopPolling() {
     if (state.timer) window.clearInterval(state.timer);
     state.timer = null;
+  }
+
+  async function refreshBooking() {
+    if (!state.booking) return;
+    try {
+      const data = await api(`/dispatch/bookings/${state.booking.id}`);
+      const prev = state.booking.status;
+      state.booking = data.booking;
+      if (data.booking.status !== prev) {
+        renderTracking();
+        if (data.booking.status === "DELIVERED") renderSuccess();
+      }
+      if (data.booking.status === "DELIVERED" || data.booking.status === "CANCELLED") stopPolling();
+    } catch {
+      /* transient — retry next tick */
+    }
   }
 
   async function onCancel() {
@@ -598,7 +609,7 @@
       const data = await api(`/dispatch/bookings/${state.booking.id}/cancel`, { method: "POST" });
       state.booking = data.booking;
       ui.toast(`Refunded ${data.refundedNgn}`, "success");
-      stopAuto();
+      stopPolling();
       renderTracking();
     } catch (err) {
       ui.toast(err.message, "error");

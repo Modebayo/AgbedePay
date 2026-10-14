@@ -21,6 +21,32 @@ taken the whole site down before — see "Why the site went down" below.
 | `PORT`          | yes      | Port the proxy forwards to. Defaults to `3000`.     |
 | `NODE_ENV`      | no       | Set to `production` so internals are never returned.|
 | `SMS_PROVIDER`  | no       | `mock` (default, prints to console) or `termii`.   |
+| `APP_BASE_URL`  | prod     | Public origin, e.g. `https://agbedepay.com`. Used for payment callbacks. |
+| `GOOGLE_MAPS_BROWSER_KEY` | no | Browser key (referrer-restricted). Absent ⇒ mock routes. |
+| `GOOGLE_MAPS_SERVER_KEY`  | no | Server key (IP-restricted, Routes API enabled). |
+| `PAYSTACK_SECRET_KEY` | yes (prod) | Paystack secret key. Absent in prod ⇒ payments disabled, never mocked. |
+| `PAYSTACK_PUBLIC_KEY` | no  | Paystack public key.                               |
+| `FLUTTERWAVE_SECRET_KEY` | alt | Only if using Flutterwave instead of Paystack. |
+| `FLUTTERWAVE_WEBHOOK_SECRET` | alt | The "Secret hash" set in the Flutterwave dashboard. |
+| `PLATFORM_COMMISSION_BP` | no | Default trip commission in basis points; `1500` = 15%. |
+
+Payments pick their provider from the environment (see `providers/paymentProvider.js`):
+Paystack if its secret key is set, else Flutterwave, else the **mock** in
+development, else an **unavailable** provider that fails every call with
+`PAYMENTS_UNCONFIGURED`. Production never silently falls back to the mock — that
+would credit wallets for free.
+
+#### Payment webhooks
+
+Register the webhook in the gateway dashboard (they do not auto-configure):
+
+- Paystack → `{APP_BASE_URL}/api/payments/webhook`
+- Flutterwave → `{APP_BASE_URL}/api/payments/webhook/flutterwave`
+
+The handler verifies the provider signature against the **raw** request body
+(captured in `app.js`), de-duplicates replays in `payment_events`, then settles
+the wallet through the normal `FUNDING` ledger path keyed by `pay:<reference>` —
+so a retried webhook and a client-side verify both credit at most once.
 
 `app.listen(env.port)` binds all interfaces, so `0.0.0.0` and `::` both accept
 connections. Your proxy must forward to the same `PORT` the app is listening on
@@ -36,6 +62,61 @@ and are idempotent, so re-running is safe.
 `npm run db:setup` (`db:create` + `db:migrate` + `db:seed`) is for a **brand new
 database only**. Never run it against a database with real data — `db:seed`
 truncates.
+
+### Staging cutover checklist
+
+The ride / driver / cargo / payments work introduces migrations `028`–`035`, and
+the AgbedePay account-number feature adds `036`. They are additive and idempotent,
+but until they are applied the affected endpoints degrade (they return errors
+rather than corrupt anything).
+
+```bash
+# 1. Apply pending migrations (prints [skip] for applied, [ ok ] for pending).
+npm run db:migrate
+
+# 2. Confirm the app boots clean.
+curl -fsS "$APP_BASE_URL/health" | jq .
+
+# 3. Smoke-test the new surfaces while signed in (cookie jar):
+#    - GET  /api/geo/config             → { enabled, region }
+#    - POST /api/driver/apply           → 201 (any signed-in user; PENDING driver, flips role)
+#    - GET  /api/driver/me              → 403 unless the user is a DRIVER
+#    - POST /api/cargo/requests         → 201 quotation lead
+#    - POST /api/payments/initiate      → { authorizationUrl } (mock in dev)
+#    - GET  /api/admin/overview         → 403 unless the user is an ADMIN
+#    - GET  /api/users/me               → profile now carries accountNumber
+#    - POST /api/transactions/account/verify/agbede  → resolve a payee by account/phone
+#    - POST /api/transactions/send      → accepts recipientAccount (10 digits) OR recipientPhone
+```
+
+Roll forward only. Each migration runs in its own transaction; a failure aborts
+that file and leaves earlier ones applied. There are no down-migrations — to undo
+a schema change, write a new migration.
+
+> Do **not** point `DATABASE_URL` at the production database to "test" a
+> migration. Use a staging database restored from a recent backup.
+
+### Admin console
+
+The operator console mounts at `/api/admin` and the UI is `/pages/admin.html`.
+Every route is gated at the router by `requireAuth` + `requireRole("ADMIN")`, so
+there is no per-route gate to forget. It needs **no environment variables** and
+adds **no migration** — it reads existing tables.
+
+```bash
+# Signed in as an ADMIN (see below):
+curl -fsS -b cookies.txt "$APP_BASE_URL/api/admin/overview" | jq '.data.users'
+```
+
+- Role comes from `users.role` (migration `030`). Until `030` is applied,
+  `requireRole` reads a missing column and the admin routes return `500`, exactly
+  like the driver routes — apply migrations first.
+- The dev seed creates an ADMIN (`44444444-…`); on production, promote a user to
+  ADMIN deliberately (there is no sign-up path to the role).
+- The overview reads each module behind a missing-table guard, so a partially
+  migrated database renders zeros for the un-migrated sections rather than a
+  broken page. The four action queues (drivers / cargo / support / payments)
+  still require their own tables.
 
 ## Why the site went down (502 on every route)
 

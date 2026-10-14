@@ -183,11 +183,13 @@
     const credit = !isOut(t);
     const dir = credit ? "credit" : "debit";
     const sign = credit ? "+" : "-";
+    const party = ui.txCounterparty(t, state.walletId);
     return `
       <a class="tx-item" href="transaction.html?id=${encodeURIComponent(t.id)}">
         <div class="tx-item__icon" aria-hidden="true">${ui.icon(icons[t.type] || "wallet")}</div>
         <div class="tx-item__main">
-          <div class="tx-item__title">${ui.escapeHtml(t.narration || t.type)}</div>
+          <div class="tx-item__title">${ui.escapeHtml(party.name)}</div>
+          ${party.number ? `<div class="tx-item__number">${ui.escapeHtml(party.number)}</div>` : ""}
           <div class="tx-item__meta">
             <span class="badge badge--${t.type}">${t.type}</span>
             <span class="badge badge--${t.status}">${t.status}</span>

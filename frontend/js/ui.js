@@ -199,6 +199,30 @@ minus: '<path d="M5 12h14"/>',
     };
   }
 
+  // The other side of a transaction from the CURRENT user's point of view, so
+  // lists can show a person's name on top of their number instead of a raw
+  // narration. Self-directed movements (top-ups, savings) have no counterparty.
+  const SELF_TYPES = {
+    FUNDING: "Wallet top-up",
+    WALLET_FUNDING: "Wallet top-up",
+    CARD_FUNDING: "Card funding",
+    SAVINGS_DEPOSIT: "Savings deposit",
+    SAVINGS_WITHDRAWAL: "Savings payout",
+  };
+  function txCounterparty(t, walletId) {
+    const { credit } = txDirection(t, walletId);
+    if (SELF_TYPES[t.type]) return { name: SELF_TYPES[t.type], number: "" };
+    const bank = t.bank;
+    if (bank && (t.type === "WITHDRAWAL" || t.type === "BANK" || !(credit ? t.sender : t.receiver))) {
+      return { name: bank.accountName || bank.bankName || "Bank", number: bank.accountNumber || "" };
+    }
+    const party = credit ? t.sender : t.receiver;
+    return {
+      name: (party && party.name) || (credit ? "Money in" : "Money out"),
+      number: (party && party.phone) || "",
+    };
+  }
+
   // Colored monogram badges stand in for bank logos — no external artwork is
   // fetched. Well-known Nigerian banks get a fixed brand colour; anything else
   // falls back to initials plus a hue derived from the name so two banks never
@@ -235,6 +259,21 @@ minus: '<path d="M5 12h14"/>',
     const cls = opts.className ? `bank-badge ${opts.className}` : "bank-badge";
     const idAttr = opts.id ? ` id="${escapeHtml(opts.id)}"` : "";
     return `<span class="${cls}"${idAttr} style="background:${color}" title="${escapeHtml(name)}" aria-hidden="true">${escapeHtml(short)}</span>`;
+  }
+
+  // Inline SVG wordmarks for the mobile networks. Kept as markup (not files) so
+  // they render instantly and work offline, the same way bank badges do.
+  const NETWORK_LOGOS = {
+    MTN: `<svg viewBox="0 0 72 34" focusable="false"><rect width="72" height="34" rx="7" fill="#ffcb05"/><text x="36" y="23" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="800" fill="#111111">MTN</text></svg>`,
+    GLO: `<svg viewBox="0 0 72 34" focusable="false"><rect width="72" height="34" rx="7" fill="#0a8f3c"/><text x="36" y="24" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="17" font-weight="800" fill="#ffffff">glo</text></svg>`,
+    AIRTEL: `<svg viewBox="0 0 72 34" focusable="false"><rect width="72" height="34" rx="7" fill="#e4002b"/><text x="36" y="23" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="14" font-weight="800" fill="#ffffff">airtel</text></svg>`,
+    "9MOBILE": `<svg viewBox="0 0 72 34" focusable="false"><rect width="72" height="34" rx="7" fill="#00693e"/><text x="36" y="23" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="13" font-weight="800" fill="#a5d867">9mobile</text></svg>`,
+  };
+  function networkLogo(code) {
+    const key = String(code || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+    const svg = NETWORK_LOGOS[key];
+    if (svg) return `<span class="net-logo" aria-hidden="true">${svg}</span>`;
+    return `<span class="net-logo net-logo--fallback">${escapeHtml(code || "?")}</span>`;
   }
 
   function toast(message, type = "info") {
@@ -399,6 +438,7 @@ minus: '<path d="M5 12h14"/>',
     WITHDRAW: "withdraw",
     SUPPORT: "headset",
     WEALTH: "wealth",
+    CARGO: "box",
   };
 
   function wireNotifications(root) {
@@ -732,8 +772,10 @@ minus: '<path d="M5 12h14"/>',
     moneyInput,
     balanceHint,
     txDirection,
+    txCounterparty,
     bankStyle,
     bankBadge,
+    networkLogo,
     icon,
     toast,
     showFormErrors,

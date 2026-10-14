@@ -23,7 +23,12 @@ import withdrawRouter from "./routes/withdrawRouter.js";
 import referralRouter from "./routes/referralRouter.js";
 import dispatchRouter from "./routes/dispatchRouter.js";
 import rideRouter from "./routes/rideRouter.js";
+import driverRouter from "./routes/driverRouter.js";
+import cargoRouter from "./routes/cargoRouter.js";
+import adminRouter from "./routes/adminRouter.js";
+import paymentRouter from "./routes/paymentRouter.js";
 import placesRouter from "./routes/placesRouter.js";
+import geoRouter from "./routes/geoRouter.js";
 import supportRouter from "./routes/supportRouter.js";
 import { apiNotFound } from "./middleware/notFound.js";
 import { errorHandler } from "./middleware/errorHandler.js";
@@ -32,6 +37,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+
+// Behind a reverse proxy (Render/nginx) `req.ip` is the proxy's address unless
+// we trust the X-Forwarded-For header. Rate limiters key on req.ip, so without
+// this every client would share one bucket. Trust exactly one hop.
+app.set("trust proxy", 1);
 
 // ---- Security headers ----
 app.use(helmet());
@@ -45,7 +55,16 @@ app.use(
 );
 
 // ---- Body parsing ----
-app.use(express.json({ limit: "1mb" }));
+// Keep the raw bytes alongside the parsed JSON: payment webhooks sign the exact
+// body, so HMAC verification needs `req.rawBody`, not a re-serialised object.
+app.use(
+  express.json({
+    limit: "1mb",
+    verify: (req, _res, buf) => {
+      req.rawBody = buf;
+    },
+  })
+);
 
 // ---- Cookies (required for the httpOnly session cookie) ----
 app.use(cookieParser());
@@ -68,7 +87,12 @@ app.use("/api/withdraw", withdrawRouter);
 app.use("/api/referrals", referralRouter);
 app.use("/api/dispatch", dispatchRouter);
 app.use("/api/ride", rideRouter);
+app.use("/api/driver", driverRouter);
+app.use("/api/cargo", cargoRouter);
+app.use("/api/admin", adminRouter);
+app.use("/api/payments", paymentRouter);
 app.use("/api/places", placesRouter);
+app.use("/api/geo", geoRouter);
 app.use("/api/support", supportRouter);
 
 // DEV endpoints are NEVER mounted in production.

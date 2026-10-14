@@ -40,8 +40,35 @@ export async function findByUserId(id) {
   return rows[0] ?? null;
 }
 
-export async function findByReferralCode(code) {
+// The user's 10-digit AgbedePay account number (migration 036). Kept out of the
+// core profile SELECT on purpose, so the profile endpoint keeps working before
+// that migration is applied — the caller guards this the same way it guards role.
+export async function getAccountNumberById(id) {
+  const { rows } = await query(`SELECT account_number FROM users WHERE id = $1`, [id]);
+  return rows[0]?.account_number ?? null;
+}
+
+// Resolve the owner of a 10-digit AgbedePay account number. Used by the
+// name-enquiry preview and by account-number wallet transfers.
+export async function findByAccountNumber(accountNumber) {
   const { rows } = await query(
+    `SELECT id, full_name, phone, status, account_number
+       FROM users
+      WHERE account_number = $1`,
+    [accountNumber]
+  );
+  return rows[0] ?? null;
+}
+
+// Role lookup (CUSTOMER / DRIVER / ADMIN). Kept out of the session query on
+// purpose: role-guarded endpoints pay for this tiny read, and unrelated
+// endpoints keep working even before the roles migration is applied.
+export async function getRoleById(id) {
+  const { rows } = await query(`SELECT role FROM users WHERE id = $1`, [id]);
+  return rows[0]?.role ?? null;
+}
+
+export async function findByReferralCode(code) {  const { rows } = await query(
     `SELECT id, full_name, phone, status, referral_code
        FROM users
       WHERE referral_code = $1`,

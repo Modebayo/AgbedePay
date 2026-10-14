@@ -9,11 +9,13 @@
 
 | Endpoint | What it does |
 |---|---|
-| `POST /api/transactions/send` | Send money to any wallet by phone. Requires session + `Idempotency-Key` + your PIN. |
+| `POST /api/transactions/send` | Send money to any wallet by phone **or** 10-digit AgbedePay account number. Requires session + `Idempotency-Key` + your PIN. |
+| `POST /api/transactions/account/verify` | NUBAN name enquiry for a bank account (the "who am I paying?" preview). |
+| `POST /api/transactions/account/verify/agbede` | Resolve an AgbedePay holder's name from their account number **or** phone (transfer preview). |
 | `GET /api/transactions` | Your history, paginated (`?page=&limit=`), filterable (`?status=&type=`). |
 | `GET /api/transactions/:id` | One transaction, with sender/receiver names. Ownership-checked. |
 | `GET /api/transactions/:id/receipt` | Customer-facing receipt (completed transactions only). |
-| `POST /api/transactions/:id/reverse` | Reverse a successful transfer (sender or receiver, with PIN). |
+| `POST /api/transactions/:id/reverse` | Reverse a successful transfer (sender or receiver, with PIN). **Backend-only** — the customer UI no longer surfaces a reverse action (see §1.1). |
 
 New files:
 
@@ -27,7 +29,49 @@ backend/src/models/transferModel.js               THE money movement (ACID + loc
 backend/src/utils/reference.js                    TXN-… / RVS-… reference generator
 ```
 
+### AgbedePay account numbers
+
+Every user gets a **10-digit** `users.account_number` (migration `036`, drawn from
+a dedicated sequence starting at `2100000000`). It is the wallet-holder's public
+identifier — like a bank account number, but for AgbedePay. Two consequences:
+
+- **Send by account number** — `POST /transactions/send` accepts either
+  `recipientPhone` (11 digits) or `recipientAccount` (10 digits); the service
+  rejects a request that supplies both or neither. Everything downstream (limits,
+  row locks, idempotency, ledger) is identical to a phone transfer.
+- **Name preview** — `POST /transactions/account/verify/agbede` resolves the
+  holder's display name from either identifier so the sender *sees* who they're
+  paying before confirming; the backend re-resolves at send time, so a tampered
+  client can't invent a payee. (The bank tab uses the sibling
+  `/transactions/account/verify` NUBAN lookup.)
+
+The frontend exposes the user's own number on the dashboard (tap to copy) and, on
+the transfer page, accepts a phone **or** the account number with live name sync.
+The bank picker is a searchable combobox over the bank directory.
+
+### 1.1 Transaction detail & receipt (frontend)
+
+The transaction detail page (`frontend/pages/transaction.html`) shows the
+counterparty with their **account name on top and their number underneath**, and
+carries two corner actions:
+
+- **Report issue** (left) — opens a modal that files a real support ticket via
+  `POST /api/support/tickets`, with the category derived from the transaction
+  (`WITHDRAWAL` for cash-outs, `PAYMENT` otherwise) and the subject
+  `Issue with <reference>`. This *replaced* the old reverse-transfer button and
+  modal: a customer who thinks something is wrong talks to a human instead of
+  self-reversing, while the `/reverse` endpoint stays available to support.
+- **Share PDF** (right) — links to `receipt.html`, whose action uses the native
+  share sheet (`navigator.share`) and falls back to the print dialog
+  (`Print → Save as PDF`) where the Web Share API is unavailable.
+
+The recent-transaction lists on the dashboard and `transactions.html` use the
+same helper (`ui.txCounterparty`) so they, too, show the person's name over their
+number rather than a raw narration. On the airtime page the network picker
+renders operator **logos** (`ui.networkLogo`) instead of names.
+
 ---
+
 
 ## 2. Why a transfer must be ONE database transaction (ACID)
 
@@ -181,5 +225,10 @@ cleartext field in one request, verified against the Argon2id hash — never log
 Open two terminals, log in as Ada and Chidi (`08012345678` / `08087654321`, PIN
 `482913`), and from Ada send ₦10,000 with the **same** `Idempotency-Key` twice.
 Confirm: one `TRANSFER` row, one debit, `replayed: true` the second time. Then
-list Chidi's wallet before/after. Then reverse it as Chidi and watch both
-balances return to their starting values while the original shows `REVERSED`.
+list Chidi's wallet before/after.
+
+Reversal is now API-only (no customer UI action), so exercise it with the
+endpoint directly: `POST /api/transactions/:id/reverse` as Chidi (PIN `482913`)
+and watch both balances return to their starting values while the original shows
+`REVERSED`. From the UI, the replacement path is **Report issue**, which files a
+ticket rather than moving money.

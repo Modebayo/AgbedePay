@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Send money — AgbedePay</title>
+  <title>Transfer — AgbedePay</title>
   <link rel="stylesheet" href="../css/style.css" />
   <link rel="icon" type="image/svg+xml" href="../brand/favicon.svg" />
   <script>try{if(localStorage.getItem("agbe_theme")==="dark")document.documentElement.setAttribute("data-theme","dark")}catch(e){}</script>
@@ -21,13 +21,13 @@
     <main class="page">
       <div class="page-head">
         <div>
-          <h1 class="page-title">Send money</h1>
-          <p class="page-sub">Instant to another AgbedePay wallet or any bank account.</p>
+          <h1 class="page-title">Transfer</h1>
+          <p class="page-sub">Instant to another AgbedePay account or any bank.</p>
         </div>
         <a class="link-btn" href="request.html">Request money</a>
       </div>
 
-      <div class="send-methods" role="tablist" aria-label="Send method">
+      <div class="send-methods" role="tablist" aria-label="Transfer method">
         <button class="send-method is-active" type="button" data-method="wallet" role="tab" aria-selected="true">To AgbedePay</button>
         <button class="send-method" type="button" data-method="bank" role="tab" aria-selected="false">Other bank</button>
       </div>
@@ -35,19 +35,25 @@
       <form class="form card" id="send-form" novalidate>
         <div class="error-banner" role="alert"></div>
 
-        <div class="field" data-field="recipient">
-          <label class="field__label" for="recipient">Recipient phone number</label>
-          <input class="input" id="recipient" name="recipientPhone" type="tel" inputmode="numeric" autocomplete="tel" maxlength="11" placeholder="e.g. 08087654321" required />
+        <div class="field" data-field="wallet">
+          <label class="field__label" for="recipient">Recipient phone or AgbedePay account number</label>
+          <input class="input" id="recipient" name="recipientPhone" type="text" inputmode="numeric" autocomplete="off" maxlength="11" placeholder="08087654321 or 10-digit account" required />
           <p class="field__error"></p>
+          <p class="bank-verified" id="wallet-verified" hidden>
+            <span class="ic ic--check" aria-hidden="true"></span> Sending to <strong id="wallet-verified-name"></strong>
+          </p>
         </div>
 
         <div class="field" data-field="bank" hidden>
-          <label class="field__label" for="bank-name">Bank</label>
+          <label class="field__label" for="bank-search">Bank</label>
           <div class="bank-pick">
             <span class="bank-badge bank-badge--lg" id="bank-name-badge" aria-hidden="true">BK</span>
-            <select class="input" id="bank-name" name="bankName" required>
-              <option value="">Select a bank…</option>
-            </select>
+            <div class="combobox" id="bank-combobox">
+              <input class="input combobox__input" id="bank-search" type="text" role="combobox" aria-expanded="false" aria-controls="bank-menu" aria-autocomplete="list" autocomplete="off" placeholder="Search banks…" />
+              <input type="hidden" id="bank-name" name="bankName" />
+              <button class="combobox__clear" id="bank-clear" type="button" hidden aria-label="Clear selected bank">&times;</button>
+              <div class="combobox__menu" id="bank-menu" role="listbox" aria-label="Banks" hidden></div>
+            </div>
           </div>
           <p class="field__error"></p>
         </div>

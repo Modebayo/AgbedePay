@@ -1,6 +1,6 @@
-// receipt page — a clean, branded receipt you can print or save as PDF
-// (browser "Print → Save as PDF"). Reads the same receipt endpoint the
-// transaction detail page uses.
+// receipt page — a clean, branded receipt you can share as a PDF (native share
+// sheet where available, otherwise the browser "Print → Save as PDF" dialog).
+// Reads the same receipt endpoint the transaction detail page uses.
 
 (function () {
   "use strict";
@@ -26,20 +26,24 @@
     }
   });
 
+  // Account name on top, the number underneath.
+  function party(name, number) {
+    return `<div class="details__val details__val--stack">
+      <span class="details__name">${ui.escapeHtml(name || "—")}</span>
+      ${number ? `<span class="details__num">${ui.escapeHtml(number)}</span>` : ""}
+    </div>`;
+  }
+
   function accountLine(r) {
     if (r.type === "WITHDRAWAL" && r.bank) {
-      return `
-        <div class="details__row"><div class="details__key">To</div><div class="details__val">${ui.escapeHtml(r.bank.bankName)} ·${ui.escapeHtml(r.bank.accountName)} ·••${ui.escapeHtml(r.bank.accountNumber.slice(-4))}</div></div>`;
+      return `<div class="details__row"><div class="details__key">To</div>${party(r.bank.accountName || r.bank.bankName, `${r.bank.bankName} ·••${String(r.bank.accountNumber || "").slice(-4)}`)}</div>`;
     }
     if (r.type === "FUNDING") {
       return `<div class="details__row"><div class="details__key">To</div><div class="details__val">Your wallet</div></div>`;
     }
-    const mineFirst = r.direction === "DEBIT";
-    const from = r.sender ? `${r.sender.name || "—"}${r.sender.phone ? " · " + r.sender.phone : ""}` : "AgbedePay";
-    const to = r.receiver ? `${r.receiver.name || "—"}${r.receiver.phone ? " · " + r.receiver.phone : ""}` : "—";
     return `
-      <div class="details__row"><div class="details__key">From</div><div class="details__val">${ui.escapeHtml(from)}</div></div>
-      <div class="details__row"><div class="details__key">To</div><div class="details__val">${ui.escapeHtml(to)}</div></div>`;
+      <div class="details__row"><div class="details__key">From</div>${party(r.sender ? r.sender.name : "AgbedePay", r.sender ? r.sender.phone : "")}</div>
+      <div class="details__row"><div class="details__key">To</div>${party(r.receiver ? r.receiver.name : "—", r.receiver ? r.receiver.phone : "")}</div>`;
   }
 
   function render(r) {
@@ -74,7 +78,26 @@
       </div>
     `;
 
-    const btn = document.querySelector(".print-toolbar button");
-    if (btn) btn.addEventListener("click", () => window.print());
+    const btn = document.querySelector("#share-btn");
+    if (btn) {
+      btn.addEventListener("click", async () => {
+        const shareData = {
+          title: "AgbedePay receipt",
+          text: `${r.reference} · ${r.amountNgn}`,
+          url: window.location.href,
+        };
+        if (navigator.share) {
+          try {
+            await navigator.share(shareData);
+            return;
+          } catch (e) {
+            if (e && e.name === "AbortError") return;
+          }
+        }
+        // No share sheet (or sharing unavailable) — fall back to the print
+        // dialog, where the user can Save as PDF.
+        window.print();
+      });
+    }
   }
 })();

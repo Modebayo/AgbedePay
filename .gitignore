@@ -10,10 +10,12 @@ node_modules/
 *.log
 logs/
 
-# Database backups
-*.sql
+# Database backups (dumps)
 *.sql.gz
 *.dump
+*.sql
+# ...but schema migrations are source code and MUST be version-controlled.
+!backend/src/database/migrations/*.sql
 
 # OS files
 .DS_Store

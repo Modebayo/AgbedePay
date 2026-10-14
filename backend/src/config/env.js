@@ -39,4 +39,57 @@ export const env = {
     // use something like https://v4.api.termii.com). Override in .env.
     return process.env.TERMII_BASE_URL ?? "https://v4.api.termii.com";
   },
+  // Public base URL of this deployment, used to build provider callback/webhook
+  // URLs. Falls back to localhost in development.
+  get appBaseUrl() {
+    return (process.env.APP_BASE_URL ?? `http://localhost:${this.port}`).replace(/\/+$/, "");
+  },
+  // ---- Google Maps / Routes ----
+  // Browser key is embedded in the frontend (restrict it by HTTP referrer).
+  // Server key stays on the backend (restrict by IP; enable Routes API).
+  // When EITHER is absent the app falls back to a deterministic mock route —
+  // so the product works with no key and upgrades the moment one is added.
+  get googleMapsBrowserKey() {
+    return process.env.GOOGLE_MAPS_BROWSER_KEY ?? "";
+  },
+  get googleMapsServerKey() {
+    return process.env.GOOGLE_MAPS_SERVER_KEY ?? "";
+  },
+  get googleMapsRegion() {
+    return process.env.GOOGLE_MAPS_REGION ?? "NG";
+  },
+  get googleMapsEnabled() {
+    return Boolean(this.googleMapsBrowserKey && this.googleMapsServerKey);
+  },
+  // Default platform commission (basis points) when a driver profile / pricing
+  // rule does not specify its own. 1500 = 15%.
+  get platformCommissionBp() {
+    return Number(process.env.PLATFORM_COMMISSION_BP ?? 1500);
+  },
+  // ---- Paystack (test mode) ----
+  get paystackSecretKey() {
+    return process.env.PAYSTACK_SECRET_KEY ?? "";
+  },
+  get paystackPublicKey() {
+    return process.env.PAYSTACK_PUBLIC_KEY ?? "";
+  },
+  get paystackBaseUrl() {
+    return process.env.PAYSTACK_BASE_URL ?? "https://api.paystack.co";
+  },
+  // ---- Flutterwave (scaffold) ----
+  get flutterwaveSecretKey() {
+    return process.env.FLUTTERWAVE_SECRET_KEY ?? "";
+  },
+  get flutterwavePublicKey() {
+    return process.env.FLUTTERWAVE_PUBLIC_KEY ?? "";
+  },
+  get flutterwaveWebhookHash() {
+    return process.env.FLUTTERWAVE_WEBHOOK_SECRET ?? "";
+  },
+  get flutterwaveBaseUrl() {
+    return process.env.FLUTTERWAVE_BASE_URL ?? "https://api.flutterwave.com/v3";
+  },
+  get paymentsEnabled() {
+    return Boolean(this.paystackSecretKey || this.flutterwaveSecretKey);
+  },
 };

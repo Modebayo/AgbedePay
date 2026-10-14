@@ -25,6 +25,19 @@ export async function findByOwnerPhone(phone) {
   return rows[0] ?? null;
 }
 
+// Find a wallet by the owner's AgbedePay ACCOUNT NUMBER (migration 036) — the
+// bankless alternative to a phone lookup for wallet-to-wallet transfers.
+export async function findByOwnerAccountNumber(accountNumber) {
+  const { rows } = await query(
+    `SELECT w.id, w.currency, w.balance_minor, w.status, w.updated_at
+       FROM wallets w
+       JOIN users u ON u.id = w.user_id
+      WHERE u.account_number = $1`,
+    [accountNumber]
+  );
+  return rows[0] ?? null;
+}
+
 // The OWNER of a wallet, by wallet id — e.g. to notify the receiver of a transfer.
 export async function findUserIdByWalletId(walletId) {
   const { rows } = await query(`SELECT user_id FROM wallets WHERE id = $1`, [walletId]);

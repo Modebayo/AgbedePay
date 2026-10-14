@@ -12,6 +12,7 @@ import {
   sendMoneySchema,
   sendToBankSchema,
   verifyBankAccountSchema,
+  verifyAgbedeAccountSchema,
   requestMoneySchema,
   payRequestSchema,
   reverseSchema,
@@ -43,6 +44,12 @@ router.post(
   transferController.verifyBankAccount
 );
 router.post(
+  "/account/verify/agbede",
+  requireAuth,
+  validate(verifyAgbedeAccountSchema),
+  transferController.verifyAgbedeAccount
+);
+router.post(
   "/send/bank",
   requireAuth,
   sendMoneyLimiter,
@@ -57,6 +64,7 @@ router.get("/requests", requireAuth, requestController.list);
 router.post(
   "/requests/:id/pay",
   requireAuth,
+  sendMoneyLimiter,
   validate(requestIdParams, "params"),
   validate(payRequestSchema),
   requireIdempotencyKey,
@@ -90,6 +98,7 @@ router.get(
 router.post(
   "/:id/reverse",
   requireAuth,
+  sendMoneyLimiter,
   validate(transactionIdParams, "params"),
   validate(reverseSchema),
   transferController.reverse

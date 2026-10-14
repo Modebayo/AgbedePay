@@ -10,6 +10,7 @@
 // All money is INTEGER kobo; formatted only at the edge.
 
 import * as dispatchModel from "../models/dispatchModel.js";
+import * as driverModel from "../models/driverModel.js";
 import * as walletModel from "../models/wallets.js";
 import * as userModel from "../models/users.js";
 import * as auditModel from "../models/audit.js";
@@ -19,6 +20,8 @@ import { generateReference } from "../utils/reference.js";
 import { ApiError } from "../utils/errors.js";
 import { formatNaira } from "../utils/money.js";
 import { assertWalletActive } from "./walletService.js";
+import { computeRoute } from "./mapsService.js";
+import * as pricingService from "./pricingService.js";
 import * as provider from "../providers/mockDispatchProvider.js";
 
 // ---- Shared helpers ---------------------------------------------------------
@@ -50,9 +53,16 @@ const STATUS_LABELS = {
   CANCELLED: "Cancelled",
 };
 
-function toApiBooking(b) {
+// The delivery code is the customer's proof-of-delivery secret: the rider must
+// produce it to release the escrowed fare. It is therefore revealed ONLY to the
+// booking owner, ONLY on the single-booking detail view, and ONLY while a rider
+// is actually engaged — never sprayed across every list item, never before a
+// rider is assigned, and never after the trip has ended (when it is spent).
+const DELIVERY_CODE_STATUSES = new Set(["RIDER_ASSIGNED", "PICKED_UP", "IN_TRANSIT"]);
+
+function toApiBooking(b, { includeDeliveryCode = false } = {}) {
   const breakdown = Array.isArray(b.fare_breakdown) ? b.fare_breakdown : b.fare_breakdown?.lines ?? [];
-  return {
+  const out = {
     id: b.id,
     serviceType: b.service_type,
     itemType: b.item_type,
@@ -61,6 +71,8 @@ function toApiBooking(b) {
     pickupContact: b.pickup_contact,
     dropoffAddress: b.dropoff_address,
     dropoffContact: b.dropoff_contact,
+    pickup: { lat: Number(b.pickup_lat), lng: Number(b.pickup_lng) },
+    dropoff: { lat: Number(b.dropoff_lat), lng: Number(b.dropoff_lng) },
     distanceKm: Number(b.distance_km),
     etaMin: b.est_duration_min,
     fareBreakdown: breakdown,
@@ -87,9 +99,12 @@ function toApiBooking(b) {
     ledgerStatus: b.ledger_status ?? null,
     createdAt: b.created_at,
     updatedAt: b.updated_at,
-    // DEV/MOCK: only this app knows the delivery code — the "courier" is fake.
-    devMock: { deliveryCode: provider.otpFromReference(b.reference).code },
   };
+  if (includeDeliveryCode && DELIVERY_CODE_STATUSES.has(b.status)) {
+    // DEV/MOCK: only this app knows the delivery code — the "courier" is fake.
+    out.devMock = { deliveryCode: provider.otpFromReference(b.reference).code };
+  }
+  return out;
 }
 
 // ---- Meta & quote ------------------------------------------------------------
@@ -101,18 +116,35 @@ export async function meta() {
   };
 }
 
-export async function quoteService({ pickup, dropoff, itemType, vehicleType, serviceType }) {
-  const distanceKm = provider.distanceKmBetween(pickup, dropoff);
-  const q = provider.quote({ itemType, vehicleType, distanceKm, serviceType });
+async function buildQuote({ pickup, dropoff, itemType, vehicleType, serviceType }) {
+  const route = await computeRoute({ origin: pickup, destination: dropoff });
+  const rate = await pricingService.ratesFor("DISPATCH", vehicleType);
+  const q = provider.quote({
+    itemType,
+    vehicleType,
+    distanceKm: route.distanceKm,
+    serviceType,
+    baseMinor: rate?.baseMinor,
+    perKmMinor: rate?.perKmMinor,
+  });
   if (!q.ok) {
     throw new ApiError(400, "This vehicle cannot carry that item", "VEHICLE_CANNOT_CARRY");
   }
+  return { route, rate, q };
+}
+
+export async function quoteService({ pickup, dropoff, itemType, vehicleType, serviceType }) {
+  const { route, q } = await buildQuote({ pickup, dropoff, itemType, vehicleType, serviceType });
   return {
-    distanceKm,
+    distanceKm: route.distanceKm,
     etaMin: q.etaMin,
     fareBreakdown: q.breakdown,
     totalMinor: q.totalMinor,
     totalNgn: q.totalNgn,
+    polyline: route.polyline,
+    source: route.source,
+    origin: route.origin,
+    destination: route.destination,
   };
 }
 
@@ -136,13 +168,11 @@ export async function createBooking({
   await requireOwnPin(pin, userId);
 
   // The fare is recomputed here, server-side, from the addresses alone.
-  const { distanceKm, etaMin, fareBreakdown, totalMinor } = await quoteService({
-    pickup,
-    dropoff,
-    itemType,
-    vehicleType,
-    serviceType,
-  });
+  const { route, q } = await buildQuote({ pickup, dropoff, itemType, vehicleType, serviceType });
+  const distanceKm = route.distanceKm;
+  const etaMin = q.etaMin;
+  const fareBreakdown = q.breakdown;
+  const totalMinor = q.totalMinor;
   if (totalMinor <= 0) throw new ApiError(400, "Invalid fare", "VALIDATION_ERROR");
 
   const reference = generateReference("DPK");
@@ -168,12 +198,12 @@ export async function createBooking({
       vehicleType,
       pickupAddress: pickup,
       pickupContact,
-      pickupLat: provider.coordsFor(pickup).lat,
-      pickupLng: provider.coordsFor(pickup).lng,
+      pickupLat: route.origin.lat,
+      pickupLng: route.origin.lng,
       dropoffAddress: dropoff,
       dropoffContact,
-      dropoffLat: provider.coordsFor(dropoff).lat,
-      dropoffLng: provider.coordsFor(dropoff).lng,
+      dropoffLat: route.destination.lat,
+      dropoffLng: route.destination.lng,
       distanceKm,
       estDurationMin: etaMin,
       fareBreakdown,
@@ -219,6 +249,14 @@ export async function createBooking({
     title: `Pickup booked · ${pickup} → ${dropoff}`,
     body: `${formatNaira(totalMinor)} held for your ${itemType.toLowerCase()} delivery.`,
   });
+
+  // Offer to online drivers whose vehicle matches the booking. Best-effort.
+  try {
+    const ids = await driverModel.onlineDriversForVehicle(result.booking.vehicle_type);
+    await driverModel.createOffers({ kind: "DISPATCH", bookingId: result.booking.id, driverUserIds: ids });
+  } catch {
+    /* driver tables not migrated yet */
+  }
 
   return {
     booking: toApiBooking({ ...result.booking, reference: result.ledger.reference }),
@@ -275,7 +313,7 @@ export async function getBooking({ userId, id }) {
   if (!booking || booking.user_id !== userId) {
     throw new ApiError(404, "Booking not found", "NOT_FOUND");
   }
-  return { booking: toApiBooking(booking) };
+  return { booking: toApiBooking(booking, { includeDeliveryCode: true }) };
 }
 
 // ---- Status machine ------------------------------------------------------------

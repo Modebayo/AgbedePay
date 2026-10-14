@@ -73,6 +73,14 @@ export const verifyBankAccount = asyncHandler(async (req, res) => {
   res.json({ success: true, data, message: "Account verified." });
 });
 
+export const verifyAgbedeAccount = asyncHandler(async (req, res) => {
+  const data = await transferService.verifyAgbedeAccount(req.user.id, {
+    accountNumber: req.body.accountNumber,
+    phone: req.body.phone,
+  });
+  res.json({ success: true, data, message: "Account verified." });
+});
+
 export const sendToBank = asyncHandler(async (req, res) => {
   const data = await transferService.sendToBankMoney({
     ...req.body,

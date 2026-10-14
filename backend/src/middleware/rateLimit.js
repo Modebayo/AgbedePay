@@ -44,3 +44,32 @@ export const sendMoneyLimiter = rateLimit({
   limit: 5,
   keyGenerator: (req) => String(req.user.id),
 });
+
+// Cargo quotation requests move no money but create work for admins, so they
+// are bounded per user (form spam) rather than per IP.
+export const cargoLimiter = rateLimit({
+  ...defaults,
+  windowMs: 60 * 60 * 1000,
+  limit: 10,
+  keyGenerator: (req) => String(req.user.id),
+});
+
+// Checkout starts are keyed per user: each one creates a payment row (and, with
+// a live gateway, a remote session). 20/hour is generous for a human topping up
+// but stops scripted row-spam / gateway-session abuse.
+export const paymentsLimiter = rateLimit({
+  ...defaults,
+  windowMs: 60 * 60 * 1000,
+  limit: 20,
+  keyGenerator: (req) => String(req.user.id),
+});
+
+// Changing the transaction PIN is a high-value action (whoever controls the PIN
+// controls the wallet), so it is tightly bounded per user to slow PIN guessing
+// by an attacker who already holds a session.
+export const pinChangeLimiter = rateLimit({
+  ...defaults,
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
+  keyGenerator: (req) => String(req.user.id),
+});

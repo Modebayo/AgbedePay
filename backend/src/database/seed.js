@@ -79,6 +79,25 @@ const INSERT_WEALTH_GOAL = `
   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
   ON CONFLICT (id) DO NOTHING`;
 
+// Drivers and admins are ordinary users with a role. Keeping them here means
+// the local stack has someone to accept ride/dispatch offers and someone to
+// approve them. Re-running the seed always (re)sets the role, so a user who
+// was promoted can be reset cleanly.
+const SET_ROLE = `UPDATE users SET role = $2 WHERE id = $1`;
+
+const INSERT_DRIVER_PROFILE = `
+  INSERT INTO driver_profiles
+    (user_id, vehicle_type, car_make_model, car_color, plate_number,
+     commission_bp, rating, trips_completed, status, is_online, last_seen_at)
+  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now())
+  ON CONFLICT (user_id) DO UPDATE SET
+    vehicle_type = EXCLUDED.vehicle_type,
+    car_make_model = EXCLUDED.car_make_model,
+    car_color = EXCLUDED.car_color,
+    plate_number = EXCLUDED.plate_number,
+    status = EXCLUDED.status,
+    is_online = EXCLUDED.is_online`;
+
 
 const instrumentIdBySymbol = new Map(INSTRUMENTS.map(([id, symbol]) => [symbol, id]));
 
@@ -88,16 +107,35 @@ try {
 
   const ADA = "11111111-1111-4111-8111-111111111111";
   const CHIDI = "22222222-2222-4222-8222-222222222222";
+  const DRIVER = "33333333-3333-4333-8333-333333333333";
+  const ADMIN = "44444444-4444-4444-8444-444444444444";
   const ADA_WALLET = "a1111111-1111-4111-8111-111111111111";
   const CHIDI_WALLET = "a2222222-2222-4222-8222-222222222222";
+  const DRIVER_WALLET = "a3333333-3333-4333-8333-333333333333";
+  const ADMIN_WALLET = "a4444444-4444-4444-8444-444444444444";
   const ADA_GOAL = "c1111111-1111-4111-8111-111111111111";
 
   await client.query(INSERT_USER, [ADA, "Ada Obi", "08012345678", "ada@example.com", PIN_HASH]);
   await client.query(INSERT_USER, [CHIDI, "Chidi Nwosu", "08087654321", "chidi@example.com", PIN_HASH]);
+  await client.query(INSERT_USER, [DRIVER, "Ngozi Eze", "08033333333", "ngozi@example.com", PIN_HASH]);
+  await client.query(INSERT_USER, [ADMIN, "Agbede Admin", "08044444444", "admin@example.com", PIN_HASH]);
+
+  await client.query(SET_ROLE, [ADA, "CUSTOMER"]);
+  await client.query(SET_ROLE, [CHIDI, "CUSTOMER"]);
+  await client.query(SET_ROLE, [DRIVER, "DRIVER"]);
+  await client.query(SET_ROLE, [ADMIN, "ADMIN"]);
 
   // Ada's balance is the sum of the movements below; see the header comment.
   await client.query(INSERT_WALLET, [ADA_WALLET, ADA, 6114000]); // ₦61,140.00
   await client.query(INSERT_WALLET, [CHIDI_WALLET, CHIDI, 5000000]); // ₦50,000.00
+  await client.query(INSERT_WALLET, [DRIVER_WALLET, DRIVER, 0]); // earnings land here
+  await client.query(INSERT_WALLET, [ADMIN_WALLET, ADMIN, 0]);
+
+  // The seeded driver is approved and on the road, so a ride/dispatch booked in
+  // dev can actually be offered to someone.
+  await client.query(INSERT_DRIVER_PROFILE, [
+    DRIVER, "CAR", "Toyota Corolla 2018", "Silver", "KJA-234XY", 1500, 4.9, 128, "ACTIVE", true,
+  ]);
 
   // Goal: New Laptop — target ₦800,000, currently ₦100,000.
   await client.query(INSERT_GOAL, [ADA_GOAL, ADA, "New Laptop", 80000000, 10000000, "2026-12-31"]);
@@ -229,7 +267,8 @@ try {
   }
 
   await client.query("COMMIT");
-  console.log("Seeded development data: Ada + Chidi users, wallets, 1 savings goal, 3 transactions,");
+  console.log("Seeded development data: Ada + Chidi + driver (Ngozi) + admin users, wallets,");
+  console.log(" 1 driver profile, 1 savings goal, 3 transactions,");
   console.log(" 19 wealth instruments, 4 holdings, 5 wealth orders, 1 retirement goal.");
 } catch (err) {
   await client.query("ROLLBACK");

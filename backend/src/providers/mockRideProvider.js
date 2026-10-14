@@ -4,6 +4,8 @@
 // Bargain accept/decline decision. The wallet debit + RIDE ledger rows are
 // REAL; only the driver network is simulated.
 
+import { coordsFor, distanceKmBetween } from "../utils/geo.js";
+
 // ---- Tiers ------------------------------------------------------------------
 
 const TIERS = {
@@ -35,37 +37,10 @@ const DRIVERS = [
 ];
 
 // ---- Distance (deterministic mock geo) --------------------------------------
+// Delegated to utils/geo so the mock distance can never disagree with the maps
+// service fallback. Re-exported for callers/tests that import it from here.
 
-export function coordsFor(address) {
-  const s = String(address ?? "").trim().toLowerCase();
-  let h1 = 0;
-  let h2 = 0;
-  for (let i = 0; i < s.length; i += 1) {
-    const c = s.charCodeAt(i);
-    h1 = (h1 * 31 + c) >>> 0;
-    h2 = (h2 * 17 + c + 7) >>> 0;
-  }
-  const lat = 6.42 + (h1 % 100) / 1000;
-  const lng = 3.34 + (h2 % 100) / 1000;
-  return { lat: Number(lat.toFixed(6)), lng: Number(lng.toFixed(6)) };
-}
-
-function haversineKm(a, b) {
-  const toRad = (n) => (n * Math.PI) / 180;
-  const dLat = toRad(b.lat - a.lat);
-  const dLng = toRad(b.lng - a.lng);
-  const la1 = toRad(a.lat);
-  const la2 = toRad(b.lat);
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(la1) * Math.cos(la2) * Math.sin(dLng / 2) ** 2;
-  return 6371 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
-}
-
-export function distanceKmBetween(pickup, dropoff) {
-  const km = haversineKm(coordsFor(pickup), coordsFor(dropoff));
-  return Math.max(1, Number(km.toFixed(2)));
-}
+export { coordsFor, distanceKmBetween };
 
 // ---- Quote -------------------------------------------------------------------
 
@@ -77,7 +52,10 @@ function surgeFactor(distanceKm) {
   return 1.0;
 }
 
-export function quote({ tier, distanceKm, passengers }) {
+// baseMinor / perKmMinor may be supplied by the pricing service (DB rule);
+// when omitted the built-in tier constants are used. Everything else (surge,
+// passenger surcharge, eta, rounding) is unchanged.
+export function quote({ tier, distanceKm, passengers, baseMinor: baseOverride, perKmMinor: perKmOverride }) {
   const t = TIERS[tier];
   if (!t) throw new Error(`Unknown tier ${tier}`);
   if (passengers > t.maxPassengers) {
@@ -85,8 +63,9 @@ export function quote({ tier, distanceKm, passengers }) {
   }
 
   const surge = surgeFactor(distanceKm);
-  const baseMinor = t.baseMinor;
-  const distanceMinor = Math.round(t.perKmMinor * distanceKm);
+  const baseMinor = Number.isFinite(baseOverride) ? baseOverride : t.baseMinor;
+  const perKmMinor = Number.isFinite(perKmOverride) ? perKmOverride : t.perKmMinor;
+  const distanceMinor = Math.round(perKmMinor * distanceKm);
   const surgeMinor = Math.round((baseMinor + distanceMinor) * (surge - 1));
   const passengerMinor = tier === "BARGAIN" ? 0 : Math.max(0, passengers - 1) * 10000;
   const subTotal = baseMinor + distanceMinor + surgeMinor + passengerMinor;

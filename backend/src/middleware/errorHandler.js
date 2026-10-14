@@ -15,18 +15,24 @@ export function errorHandler(err, req, res, _next) {
   // a STRING code, but leaving this open to a non-string would let `err.code`
   // collide with Node's own numeric `err.code` (e.g. ECONNREFUSED), which
   // errorHandler would then report to the client as its error code.
+  //
+  // The mapping is gated on `err.name === "MulterError"` (rather than matching
+  // the `LIMIT_*` prefix alone) so our OWN domain code `LIMIT_EXCEEDED` — a 403
+  // KYC limit error with a helpful message — is not swallowed here and rewritten
+  // into a 400 "upload rejected".
   const errCode = typeof err?.code === "string" ? err.code : null;
+  const isMulterError = err?.name === "MulterError";
 
-  if (errCode === "LIMIT_FILE_SIZE") {
+  if (isMulterError && errCode === "LIMIT_FILE_SIZE") {
     err.status = 413;
     err.message = "That image is too large. The limit is 2 MB.";
-  } else if (errCode === "LIMIT_UNEXPECTED_FILE" || errCode === "LIMIT_FILE_COUNT") {
+  } else if (isMulterError && (errCode === "LIMIT_UNEXPECTED_FILE" || errCode === "LIMIT_FILE_COUNT")) {
     err.status = 400;
     err.message = 'Upload the picture as a single file in the "avatar" field.';
-  } else if (errCode === "LIMIT_PART_COUNT" || errCode === "LIMIT_FIELD_COUNT") {
+  } else if (isMulterError && (errCode === "LIMIT_PART_COUNT" || errCode === "LIMIT_FIELD_COUNT")) {
     err.status = 400;
     err.message = "That upload contained unexpected extra data.";
-  } else if (errCode?.startsWith("LIMIT_")) {
+  } else if (isMulterError && errCode?.startsWith("LIMIT_")) {
     err.status = 400;
     err.message = "That upload was rejected.";
   }

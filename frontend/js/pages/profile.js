@@ -543,7 +543,7 @@ function limitsHtml(kyc) {
     if (!l) return "";
     const pct = l.sendDailyMinor > 0 ? Math.min(100, Math.round((l.usedToday.sendMinor / l.sendDailyMinor) * 100)) : 0;
     const rows = [
-      ["Send money", l.sendDailyNgn],
+      ["Transfer", l.sendDailyNgn],
       ["Per transfer", l.sendPerTransactionNgn],
       ["Cash out", l.withdrawAllowed ? l.withdrawDailyNgn : "Locked"],
       [

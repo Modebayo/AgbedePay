@@ -16,7 +16,7 @@ import {
 } from "../validators/authSchemas.js";
 import * as authController from "../controllers/authController.js";
 import { requireAuth } from "../middleware/requireAuth.js";
-import { otpLimiter, loginLimiter, registerLimiter } from "../middleware/rateLimit.js";
+import { otpLimiter, loginLimiter, registerLimiter, pinChangeLimiter } from "../middleware/rateLimit.js";
 
 const router = Router();
 
@@ -30,6 +30,6 @@ router.get("/sessions", requireAuth, authController.listSessions);
 router.post("/sessions/:id/revoke", requireAuth, validate(sessionIdParams, "params"), authController.revokeSession);
 router.post("/forgot-pin", otpLimiter, validate(forgotPinSchema), authController.forgotPin);
 router.post("/reset-pin", otpLimiter, validate(resetPinSchema), authController.resetPin);
-router.post("/pin", requireAuth, validate(changePinSchema), authController.changePin);
+router.post("/pin", requireAuth, pinChangeLimiter, validate(changePinSchema), authController.changePin);
 
 export default router;
